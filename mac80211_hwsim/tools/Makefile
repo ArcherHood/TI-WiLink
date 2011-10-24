@@ -1,8 +1,6 @@
 all: hwsim_test
 
-ifndef CC
-CC=gcc
-endif
+CC=$(CROSS_COMPILE)gcc
 
 ifndef CFLAGS
 CFLAGS = -O2 -Wall -g
