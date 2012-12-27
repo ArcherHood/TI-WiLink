@@ -647,6 +647,7 @@ int hostapd_check_ht_capab(struct hostapd_iface *iface,
 	return 0;
 }
 
+
 static int valid_ap_channel(struct hostapd_iface *iface, int chan)
 {
 	int j;
@@ -664,6 +665,112 @@ static int valid_ap_channel(struct hostapd_iface *iface, int chan)
 
 	/* channel not found */
 	return 0;
+}
+
+
+struct oper_class_map {
+	enum hostapd_hw_mode mode;
+	u8 op_class;
+	u8 min_chan;
+	u8 max_chan;
+	u8 inc;
+	enum { BW40PLUS, BW40MINUS } bw;
+};
+
+
+static struct oper_class_map op_class[] = {
+#if 0 /* diallow HT40 on 2.4Ghz on purpose */
+	{ HOSTAPD_MODE_IEEE80211G, 83, 1, 9, 1, BW40PLUS },
+	{ HOSTAPD_MODE_IEEE80211G, 84, 5, 13, 1, BW40MINUS },
+#endif
+	{ HOSTAPD_MODE_IEEE80211A, 116, 36, 44, 8, BW40PLUS },
+	{ HOSTAPD_MODE_IEEE80211A, 117, 40, 48, 8, BW40MINUS },
+	{ HOSTAPD_MODE_IEEE80211A, 126, 149, 157, 8, BW40PLUS },
+	{ HOSTAPD_MODE_IEEE80211A, 127, 153, 161, 8, BW40MINUS },
+	{ -1, 0, 0, 0, 0, BW40PLUS } /* terminator */
+};
+
+
+/* Returns secondary channel (-1, 1), if possible considering the
+ * user preferred secondary channel. If no HT40 operation is possible,
+ * returns 0 */
+static int select_secondary_channel(struct hostapd_iface *iface,
+				    int primary_chan, int pref_sec_chan)
+{
+	int i;
+	int up_ok = 0, down_ok = 0;
+
+	for (i = 0; op_class[i].op_class; i++) {
+		struct oper_class_map *o = &op_class[i];
+		u8 ch;
+
+		if (o->mode != iface->current_mode->mode)
+			continue;
+
+		if (primary_chan < o->min_chan || primary_chan > o->max_chan)
+			continue;
+
+		for (ch = o->min_chan; ch <= o->max_chan; ch += o->inc) {
+			if (ch == primary_chan) {
+				if (o->bw == BW40PLUS)
+					up_ok = 1;
+				else if (o->bw == BW40MINUS)
+					down_ok = 1;
+
+				break;
+			}
+		}
+	}
+
+	if (up_ok && !valid_ap_channel(iface, primary_chan + 4))
+		up_ok = 0;
+	if (down_ok && !valid_ap_channel(iface, primary_chan - 4))
+		down_ok = 0;
+
+	if ((pref_sec_chan == 1 && up_ok) || (pref_sec_chan == -1 && down_ok))
+		return pref_sec_chan;
+
+	if (up_ok)
+		return 1;
+	else if (down_ok)
+		return -1;
+
+	/* no secondary channel possible */
+	return 0;
+}
+
+void set_prim_sec_chan(struct hostapd_iface *iface, int *channel_cnt,
+		       int min_cnt, int default_prim_chan)
+{
+	int j;
+
+	if (!iface->conf->secondary_channel)
+		goto set;
+
+	/* if a secondary channel is requested, try to select a channel that
+	 * allows HT40 from the minimal AP ones */
+	for (j = 0; j < iface->current_mode->num_channels; j++) {
+		int sec_chan;
+		struct hostapd_channel_data *chan =
+					&iface->current_mode->channels[j];
+
+		if (channel_cnt[j] != min_cnt)
+			continue;
+
+		sec_chan = select_secondary_channel(iface, chan->chan,
+					iface->conf->secondary_channel);
+		if (sec_chan) {
+			iface->conf->channel = chan->chan;
+			iface->conf->secondary_channel = sec_chan;
+			return;
+		}
+	}
+
+	wpa_printf(MSG_DEBUG, "Could not auto-select secondary channel");
+
+set:
+	iface->conf->channel = default_prim_chan;
+	iface->conf->secondary_channel = 0;
 }
 
 
@@ -700,7 +807,7 @@ static void hostapd_auto_select_scan_cb(struct hostapd_iface *iface)
 			chan = &iface->current_mode->channels[j];
 			if (bss->freq == chan->freq) {
 				channel_cnt[j]++;
-				wpa_printf(MSG_DEBUG, "Have %d BSSes on ch %d",
+				wpa_printf(MSG_MSGDUMP, "%d BSSes on ch %d",
 					   channel_cnt[j], chan->chan);
 				break;
 			}
@@ -734,7 +841,13 @@ static void hostapd_auto_select_scan_cb(struct hostapd_iface *iface)
 	wpa_printf(MSG_DEBUG, "Min APs found in channel %d (AP count %d)",
 		   chan->chan, min_cnt);
 
-	iface->conf->channel = chan->chan;
+	/* Select a secondary channel and fine tune the primary one.
+	 * Basically we try to start HT40, without increasing the number
+	 * of APs on the primary channel. */
+	set_prim_sec_chan(iface, channel_cnt, min_cnt, chan->chan);
+
+	wpa_printf(MSG_DEBUG, "Auto-selected channel: %d secondary: %d",
+		   iface->conf->channel, iface->conf->secondary_channel);
 
 	/* will complete interface setup */
 	hostapd_check_ht_capab(iface, scan_res);
