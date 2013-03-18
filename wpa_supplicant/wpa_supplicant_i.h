@@ -604,8 +604,14 @@ struct wpa_supplicant {
 	} scan_req, last_scan_req;
 	enum wpa_states scan_prev_wpa_state;
 	struct os_reltime scan_trigger_time, scan_start_time;
-	/* Minimum freshness requirement for connection purposes */
+	
+        /* Minimum freshness requirement for connection purposes */
 	struct os_reltime scan_min_time;
+
+	/* smart config params */
+	int smart_config_in_sync; /* SC trying to sync on channel */
+	int smart_config_freq; /* SC frequency to try decode on */
+
 	int scan_runs; /* number of scan runs since WPS was started */
 	int *next_scan_freqs;
 	int *manual_scan_freqs;
