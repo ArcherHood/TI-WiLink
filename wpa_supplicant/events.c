@@ -3045,7 +3045,9 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		if (wpa_s->smart_config_freq) {
 			/* do it forever... */
 			wpa_printf(MSG_DEBUG, "ROC again... (forever)");
-			wpa_drv_remain_on_channel(wpa_s, wpa_s->smart_config_freq, 5000);
+			wpa_drv_remain_on_channel(wpa_s,
+						  wpa_s->smart_config_freq,
+						  wpa_s->max_remain_on_chan);
 			break;
 		}
 #ifdef CONFIG_OFFCHANNEL
@@ -3249,7 +3251,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		if (wpa_s->smart_config_freq)
 			wpa_drv_remain_on_channel(wpa_s,
 						  wpa_s->smart_config_freq,
-						  5000);
+						  wpa_s->max_remain_on_chan);
 		if (wpa_s->override_sched_scan) {
 			if (wpa_supplicant_req_sched_scan(wpa_s))
 				wpa_supplicant_req_new_scan(wpa_s,
@@ -3301,7 +3303,8 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		 * it will be initiated on sched_scan stop event.
 		 */
 		if (!wpa_s->sched_scanning)
-			wpa_drv_remain_on_channel(wpa_s, freq, 5000);
+			wpa_drv_remain_on_channel(wpa_s, freq,
+						  wpa_s->max_remain_on_chan);
 		break;
 	}
 	case EVENT_SMART_CONFIG_DECODE: {
