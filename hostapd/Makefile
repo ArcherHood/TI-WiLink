@@ -9,6 +9,25 @@ endif
 CFLAGS += -I../src
 CFLAGS += -I../src/utils
 
+# local additions
+# set compiler
+ifdef CROSS_COMPILE
+CC=$(CROSS_COMPILE)gcc
+endif
+
+# set libnl & openssl libs paths
+ifdef LIBNL_PATH
+CFLAGS += -I$(LIBNL_PATH)/include
+LDFLAGS += -L$(LIBNL_PATH)/lib/.libs
+LIBS += -lm
+# hardcode libnl2 for now
+CONFIG_LIBNL20=y
+endif
+ifdef OPENSSL_PATH
+CFLAGS += -I$(OPENSSL_PATH)/include
+LDFLAGS += -L$(OPENSSL_PATH)
+endif
+
 # Uncomment following line and set the path to your kernel tree include
 # directory if your C library does not include all header files.
 # CFLAGS += -DUSE_KERNEL_HEADERS -I/usr/src/linux/include

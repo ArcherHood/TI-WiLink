@@ -13,6 +13,25 @@ PKG_CONFIG ?= pkg-config
 CFLAGS += -I../src
 CFLAGS += -I../src/utils
 
+# local additions
+# set compiler
+ifdef CROSS_COMPILE
+CC=$(CROSS_COMPILE)gcc
+endif
+
+# set libnl & openssl libs paths
+ifdef LIBNL_PATH
+CFLAGS += -I$(LIBNL_PATH)/include
+LDFLAGS += -L$(LIBNL_PATH)/lib/.libs
+LIBS += -lm
+# hardcode libnl2 for now
+CONFIG_LIBNL20=y
+endif
+ifdef OPENSSL_PATH
+CFLAGS += -I$(OPENSSL_PATH)/include
+LDFLAGS += -L$(OPENSSL_PATH)
+endif
+
 -include .config
 
 BINALL=wpa_supplicant wpa_cli
