@@ -542,6 +542,15 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 	struct wpa_driver_scan_params *scan_params;
 	size_t max_ssids;
 	enum wpa_states prev_state;
+	int force_passive = 0;
+
+	/*
+	 * We currently can't force a passive scan, because wpa_supplicant
+	 * will add a wildcard ssid if there are no SSIDs. workaround it
+	 * by explicitly checking for this variable.
+	 */
+	if (wpa_s->smart_config_in_sync)
+		force_passive = 1;
 
 	if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED) {
 		wpa_dbg(wpa_s, MSG_DEBUG, "Skip scan - interface disabled");
@@ -747,7 +756,7 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 		wpa_dbg(wpa_s, MSG_DEBUG, "Include wildcard SSID in "
 			"the scan request");
 		params.num_ssids++;
-	} else {
+	} else if (!force_passive) {
 		wpa_s->prev_scan_ssid = WILDCARD_SSID_SCAN;
 		params.num_ssids++;
 		wpa_dbg(wpa_s, MSG_DEBUG, "Starting AP scan for wildcard "
