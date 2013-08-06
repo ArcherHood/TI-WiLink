@@ -2162,6 +2162,12 @@ static void nl80211_tdls_oper_event(struct wpa_driver_nl80211_data *drv,
 	wpa_supplicant_event(drv->ctx, EVENT_TDLS, &data);
 }
 
+static void nl80211_stop_ap(struct wpa_driver_nl80211_data *drv,
+			    struct nlattr **tb)
+{
+	wpa_supplicant_event(drv->ctx, EVENT_INTERFACE_UNAVAILABLE, NULL);
+}
+
 static void
 nl80211_testmode_sc_sync_event(struct wpa_driver_nl80211_data *drv,
 			       struct nlattr **testmode)
@@ -2374,6 +2380,9 @@ static void do_process_drv_event(struct wpa_driver_nl80211_data *drv,
 	case NL80211_CMD_TESTMODE:
 		wpa_printf(MSG_DEBUG, "TESTMODE event!");
 		nl80211_testmode_event(drv, tb);
+		break;
+	case NL80211_CMD_STOP_AP:
+		nl80211_stop_ap(drv, tb);
 		break;
 	default:
 		wpa_printf(MSG_DEBUG, "nl80211: Ignored unknown event "
