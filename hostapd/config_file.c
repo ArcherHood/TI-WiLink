@@ -2909,6 +2909,14 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 			}
 		} else if (os_strcmp(buf, "ap_channel_sync") == 0) {
 			conf->ap_channel_sync = atoi(pos);
+		} else if (os_strcmp(buf, "local_pwr_constraint") == 0) {
+			int val = atoi(pos);
+			if (val < 0 || val > 255) {
+				wpa_printf(MSG_ERROR, "Line %d: Invalid local_pwr_constraint %d (expected 0..255)",
+					   line, val);
+				return 1;
+			}
+			conf->local_pwr_constraint = val;
 		} else {
 			wpa_printf(MSG_ERROR, "Line %d: unknown configuration "
 				   "item '%s'", line, buf);
