@@ -449,6 +449,11 @@ void hostapd_event_ch_switch(struct hostapd_data *hapd, int freq, int ht,
 	hapd->iconf->vht_oper_centr_freq_seg0_idx = seg0_idx;
 	hapd->iconf->vht_oper_centr_freq_seg1_idx = seg1_idx;
 
+	if (offset)
+		hapd->iconf->ht_capab |= HT_CAP_INFO_SUPP_CHANNEL_WIDTH_SET;
+	else
+		hapd->iconf->ht_capab &= ~HT_CAP_INFO_SUPP_CHANNEL_WIDTH_SET;
+
 	if (hapd->iface->csa_in_progress &&
 	    freq == hapd->iface->cs_freq_params.freq) {
 		hapd->iconf->ieee80211ac = hapd->iface->cs_freq_params.vht_enabled;
