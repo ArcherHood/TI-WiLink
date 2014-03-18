@@ -451,6 +451,8 @@ void hostapd_event_ch_switch(struct hostapd_data *hapd, int freq, int ht,
 
 	if (hapd->iface->csa_in_progress &&
 	    freq == hapd->iface->cs_freq_params.freq) {
+		hapd->iconf->ieee80211ac = hapd->iface->cs_freq_params.vht_enabled;
+
 		hostapd_cleanup_cs_params(hapd);
 
 		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_CSA_FINISHED "freq=%d",
