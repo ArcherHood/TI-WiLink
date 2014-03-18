@@ -694,6 +694,16 @@ static int hostapd_dfs_start_channel_switch_cac(struct hostapd_iface *iface)
 }
 
 
+static int hostapd_csa_in_progress(struct hostapd_iface *iface)
+{
+	int i;
+	for (i = 0; i < iface->num_bss; i++)
+		if (iface->bss[0]->csa_in_progress)
+			return 1;
+	return 0;
+}
+
+
 static int hostapd_dfs_start_channel_switch(struct hostapd_iface *iface)
 {
 	struct hostapd_channel_data *channel;
@@ -705,8 +715,13 @@ static int hostapd_dfs_start_channel_switch(struct hostapd_iface *iface)
 	struct hostapd_data *hapd = iface->bss[0];
 	int err = 1;
 
-	wpa_printf(MSG_DEBUG, "%s called (CAC active: %s)", __func__,
-		   iface->cac_started ? "yes" : "no");
+	wpa_printf(MSG_DEBUG, "%s called (CAC active: %s, CSA active: %s)",
+		   __func__, iface->cac_started ? "yes" : "no",
+		   hostapd_csa_in_progress(iface) ? "yes" : "no");
+
+	/* Check if CSA in progress */
+	if (hostapd_csa_in_progress(iface))
+		return 0;
 
 	/* Check if active CAC */
 	if (iface->cac_started)

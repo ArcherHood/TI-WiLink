@@ -30,6 +30,7 @@
 #include "ap_config.h"
 #include "hw_features.h"
 #include "dfs.h"
+#include "beacon.h"
 
 
 int hostapd_notif_assoc(struct hostapd_data *hapd, const u8 *addr,
@@ -454,11 +455,12 @@ void hostapd_event_ch_switch(struct hostapd_data *hapd, int freq, int ht,
 	else
 		hapd->iconf->ht_capab &= ~HT_CAP_INFO_SUPP_CHANNEL_WIDTH_SET;
 
-	if (hapd->iface->csa_in_progress &&
-	    freq == hapd->iface->cs_freq_params.freq) {
-		hapd->iconf->ieee80211ac = hapd->iface->cs_freq_params.vht_enabled;
+	if (hapd->csa_in_progress &&
+	    freq == hapd->cs_freq_params.freq) {
+		hapd->iconf->ieee80211ac = hapd->cs_freq_params.vht_enabled;
 
 		hostapd_cleanup_cs_params(hapd);
+		ieee802_11_set_beacon(hapd);
 
 		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_CSA_FINISHED "freq=%d",
 			freq);
