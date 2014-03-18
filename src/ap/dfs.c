@@ -712,8 +712,7 @@ static int hostapd_dfs_start_channel_switch(struct hostapd_iface *iface)
 	u8 vht_oper_centr_freq_seg1_idx;
 	int skip_radar = 1;
 	struct csa_settings csa_settings;
-	struct hostapd_data *hapd = iface->bss[0];
-	int err = 1;
+	int i, err = 1;
 
 	wpa_printf(MSG_DEBUG, "%s called (CAC active: %s, CSA active: %s)",
 		   __func__, iface->cac_started ? "yes" : "no",
@@ -768,7 +767,12 @@ static int hostapd_dfs_start_channel_switch(struct hostapd_iface *iface)
 		return err;
 	}
 
-	err = hostapd_switch_channel(hapd, &csa_settings);
+	for (i = 0; i < iface->num_bss; i++) {
+		err = hostapd_switch_channel(iface->bss[i], &csa_settings);
+		if (err)
+			break;
+	}
+
 	if (err) {
 		wpa_printf(MSG_WARNING, "DFS failed to schedule CSA (%d) - trying fallback",
 			   err);
