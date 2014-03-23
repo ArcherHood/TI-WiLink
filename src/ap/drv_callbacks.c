@@ -1046,6 +1046,12 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 	case EVENT_SURVEY:
 		hostapd_event_get_survey(hapd, &data->survey_results);
 		break;
+	case EVENT_INTERFACE_DISABLED:
+		hapd->driver->stop_ap(hapd->drv_priv);
+		break;
+	case EVENT_INTERFACE_ENABLED:
+		hostapd_reload_iface(hapd->iface);
+		break;
 #ifdef NEED_AP_MLME
 	case EVENT_DFS_RADAR_DETECTED:
 		if (!data)
