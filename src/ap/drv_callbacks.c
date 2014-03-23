@@ -830,6 +830,12 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 					data->ch_switch.ht_enabled,
 					data->ch_switch.ch_offset);
 		break;
+	case EVENT_INTERFACE_DISABLED:
+		hapd->driver->stop_ap(hapd->drv_priv);
+		break;
+	case EVENT_INTERFACE_ENABLED:
+		hostapd_reload_iface(hapd->iface);
+		break;
 	default:
 		wpa_printf(MSG_DEBUG, "Unknown event %d", event);
 		break;
