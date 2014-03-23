@@ -2035,6 +2035,8 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 		nl80211_radar_event(drv, tb);
 		break;
 	case NL80211_CMD_STOP_AP:
+		wpa_supplicant_event(drv->ctx, EVENT_INTERFACE_DISABLED, NULL);
+		wpa_supplicant_event(drv->ctx, EVENT_INTERFACE_ENABLED, NULL);
 		nl80211_stop_ap(drv, tb);
 		break;
 	case NL80211_CMD_VENDOR:
