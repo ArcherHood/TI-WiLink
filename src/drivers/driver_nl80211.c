@@ -2558,7 +2558,7 @@ static int wpa_driver_nl80211_set_country(void *priv, const char *alpha2_arg)
 		ret = nl80211_get_country(drv, alpha2_res);
 		if (ret)
 			return ret;
-		if (os_strncmp(alpha2, alpha2_res, 3)) {
+		if (os_strncmp(alpha2, alpha2_res, 2)) {
 			wpa_printf(MSG_DEBUG, "wpa_driver_nl80211_set_country:"
 					"retry country set after delay");
 			os_sleep(1, 0);
