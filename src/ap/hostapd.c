@@ -556,7 +556,7 @@ skip_mask_ext:
 
 	if (!auto_addr)
 		return 0;
-
+#if 0
 	for (i = 0; i < ETH_ALEN; i++) {
 		if ((hapd->own_addr[i] & mask[i]) != hapd->own_addr[i]) {
 			wpa_printf(MSG_ERROR, "Invalid BSSID mask " MACSTR
@@ -568,7 +568,7 @@ skip_mask_ext:
 			return -1;
 		}
 	}
-
+#endif
 	return 0;
 }
 
