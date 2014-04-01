@@ -630,6 +630,9 @@ struct hostapd_config {
 	u8 vht_oper_centr_freq_seg0_idx;
 	u8 vht_oper_centr_freq_seg1_idx;
 
+	int *acs_blacklist;
+	int *acs_whitelist;
+
 #ifdef CONFIG_P2P
 	u8 p2p_go_ctwindow;
 #endif /* CONFIG_P2P */
