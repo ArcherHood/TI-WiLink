@@ -2307,7 +2307,19 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 				wpa_printf(MSG_ERROR, "Line %d: invalid rate "
 					   "list", line);
 				errors++;
+			}		
+		} else if (os_strcmp(buf, "acs_blacklist") == 0) {
+			if (hostapd_parse_intlist(&conf->acs_blacklist, pos)) {
+				wpa_printf(MSG_ERROR, "Line %d: invalid acs "
+					   "black list", line);
+				errors++;
 			}
+		} else if (os_strcmp(buf, "acs_whitelist") == 0) {
+			if (hostapd_parse_intlist(&conf->acs_whitelist, pos)) {
+				wpa_printf(MSG_ERROR, "Line %d: invalid acs "
+					   "white list", line);
+				errors++;
+			}	
 		} else if (os_strcmp(buf, "preamble") == 0) {
 			if (atoi(pos))
 				conf->preamble = SHORT_PREAMBLE;
