@@ -672,6 +672,9 @@ struct hostapd_config {
 	struct fst_iface_cfg fst_cfg;
 #endif /* CONFIG_FST */
 
+	int *acs_blacklist;
+	int *acs_whitelist;
+
 #ifdef CONFIG_P2P
 	u8 p2p_go_ctwindow;
 #endif /* CONFIG_P2P */
