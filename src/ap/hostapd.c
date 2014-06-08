@@ -40,6 +40,7 @@ static int hostapd_setup_encryption(char *iface, struct hostapd_data *hapd);
 static int hostapd_broadcast_wep_clear(struct hostapd_data *hapd);
 static int setup_interface2(struct hostapd_iface *iface);
 static void channel_list_update_timeout(void *eloop_ctx, void *timeout_ctx);
+static int hostapd_sync_channel(struct hostapd_iface *hapd_iface);
 
 extern int wpa_debug_level;
 extern struct wpa_driver_ops *wpa_drivers[];
@@ -1053,7 +1054,19 @@ static int setup_interface2(struct hostapd_iface *iface)
 		/* Not all drivers support this yet, so continue without hw
 		 * feature data. */
 	} else {
-		int ret = hostapd_select_hw_mode(iface);
+		int ret;
+
+		if (iface->conf->ap_channel_sync &&
+		    !iface->bss[0]->csa_in_progress && !iface->fallback_csa_channel) {
+			ret = hostapd_sync_channel(iface);
+			if (ret < 0)
+				return ret;
+			/* skip other checks if channel was synced */
+			if (ret)
+				goto out;
+		}
+
+		ret = hostapd_select_hw_mode(iface);
 		if (ret < 0) {
 			wpa_printf(MSG_ERROR, "Could not select hw_mode and "
 				   "channel. (%d)", ret);
@@ -1123,6 +1136,17 @@ static int hostapd_sync_channel(struct hostapd_iface *hapd_iface)
 		hapd_iface->conf->channel = iface->conf->channel;
 		hapd_iface->conf->secondary_channel =
 				iface->conf->secondary_channel;
+		/* set current mode */
+		for (i = 0; i < hapd_iface->num_hw_features; i++) {
+			struct hostapd_hw_modes *mode =
+				&hapd_iface->hw_features[i];
+
+			if (mode->mode == hapd_iface->conf->hw_mode) {
+				hapd_iface->current_mode = mode;
+				break;
+			}
+		}
+
 		wpa_printf(MSG_DEBUG, "Channel automatically synced to "
 			   "existing AP: %d (secondary: %d) (mode: %s)",
 			   iface->conf->channel,
@@ -1157,11 +1181,6 @@ int hostapd_setup_interface_complete(struct hostapd_iface *iface, int err)
 	}
 
 	wpa_printf(MSG_DEBUG, "Completing interface initialization");
-
-	if (iface->conf->ap_channel_sync &&
-	    !hapd->csa_in_progress && !iface->fallback_csa_channel)
-		if (hostapd_sync_channel(iface) < 0)
-			return -1;
 
 	if (iface->conf->channel) {
 #ifdef NEED_AP_MLME
