@@ -22,4 +22,6 @@ int hostapd_dfs_nop_finished(struct hostapd_iface *iface, int freq,
 			     int ht_enabled,
 			     int chan_offset, int chan_width, int cf1, int cf2);
 
+void dfs_print_channels(struct hapd_interfaces *interfaces);
+
 #endif /* DFS_H */
