@@ -8200,6 +8200,17 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		return NULL;
 	}
 
+	/* allow only specific commands while in smart_config mode */
+	if ((wpa_s->smart_config_in_sync || wpa_s->smart_config_freq) &&
+	    (os_strncmp(buf, "SMART_CONFIG_", 13) &&
+	     os_strcmp(buf, "PING") &&
+	     os_strncmp(buf, "STATUS", 6))) {
+		wpa_printf(MSG_ERROR, "Commands are blocked while in smart_config mode");
+		os_memcpy(reply, "BUSY\n", 5);
+		reply_len = 5;
+		goto out;
+	}
+
 	os_memcpy(reply, "OK\n", 3);
 	reply_len = 3;
 
@@ -8665,6 +8676,15 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strcmp(buf, "INTERFACE_LIST") == 0) {
 		reply_len = wpa_supplicant_global_iface_list(
 			wpa_s->global, reply, reply_size);
+	} else if (os_strncmp(buf, "SMART_CONFIG_START ", 19) == 0) {
+		if (wpa_supplicant_smart_config_start(wpa_s, buf + 19))
+			reply_len = -1;
+	} else if (os_strcmp(buf, "SMART_CONFIG_STOP") == 0) {
+		if (wpa_supplicant_smart_config_stop(wpa_s))
+			reply_len = -1;
+	} else if (os_strncmp(buf, "SMART_CONFIG_SET_GROUP_KEY ", 27) == 0) {
+		if (wpa_supplicant_smart_config_set_group_id(wpa_s, buf + 27))
+			reply_len = -1;
 	} else if (os_strcmp(buf, "INTERFACES") == 0) {
 		reply_len = wpa_supplicant_global_iface_interfaces(
 			wpa_s->global, reply, reply_size);
@@ -8839,7 +8859,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
 		reply_len = 16;
 	}
-
+out:
 	if (reply_len < 0) {
 		os_memcpy(reply, "FAIL\n", 5);
 		reply_len = 5;
