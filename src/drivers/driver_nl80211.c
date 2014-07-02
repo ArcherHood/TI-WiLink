@@ -24,7 +24,7 @@
 #include <linux/filter.h>
 #include <linux/errqueue.h>
 #include "nl80211_copy.h"
-#include "testmode_copy.h"
+#include "ti_vendor_cmd.h"
 
 #include "common.h"
 #include "eloop.h"
@@ -2576,18 +2576,18 @@ static void nl80211_tdls_oper_event(struct wpa_driver_nl80211_data *drv,
 }
 
 static void
-nl80211_testmode_sc_sync_event(struct wpa_driver_nl80211_data *drv,
-			       struct nlattr **testmode)
+nl80211_vendor_ti_sc_sync_event(struct wpa_driver_nl80211_data *drv,
+				struct nlattr **tb)
 {
 	union wpa_event_data data;
 	u32 freq;
 
-	wpa_printf(MSG_DEBUG, "nl80211: testmode sc sync event");
+	wpa_printf(MSG_DEBUG, "nl80211: vendor ti sc sync event");
 
-	if (!testmode[WL1271_TM_ATTR_FREQ])
+	if (!tb[WLCORE_VENDOR_ATTR_FREQ])
 		return;
 
-	freq = nla_get_u32(testmode[WL1271_TM_ATTR_FREQ]);
+	freq = nla_get_u32(tb[WLCORE_VENDOR_ATTR_FREQ]);
 	wpa_printf(MSG_DEBUG, "found freq=%d", freq);
 
 	os_memset(&data, 0, sizeof(data));
@@ -2596,58 +2596,26 @@ nl80211_testmode_sc_sync_event(struct wpa_driver_nl80211_data *drv,
 }
 
 static void
-nl80211_testmode_sc_decode_event(struct wpa_driver_nl80211_data *drv,
-				 struct nlattr **testmode)
+nl80211_vendor_ti_sc_decode_event(struct wpa_driver_nl80211_data *drv,
+				  struct nlattr **tb)
 {
 	union wpa_event_data data = {};
 	struct smart_config_decode *sc_data = &data.smart_config_decode;
-	wpa_printf(MSG_DEBUG, "nl80211: testmode sc decode event");
+	wpa_printf(MSG_DEBUG, "nl80211: vendor ti sc decode event");
 
-	if (!testmode[WL1271_TM_ATTR_SSID])
+	if (!tb[WLCORE_VENDOR_ATTR_SSID])
 		return;
 
-	sc_data->ssid = nla_data(testmode[WL1271_TM_ATTR_SSID]);
-	sc_data->ssid_len = nla_len(testmode[WL1271_TM_ATTR_SSID]);
+	sc_data->ssid = nla_data(tb[WLCORE_VENDOR_ATTR_SSID]);
+	sc_data->ssid_len = nla_len(tb[WLCORE_VENDOR_ATTR_SSID]);
 
-	if (testmode[WL1271_TM_ATTR_PSK]) {
-		sc_data->psk = nla_data(testmode[WL1271_TM_ATTR_PSK]);
-		sc_data->psk_len = nla_len(testmode[WL1271_TM_ATTR_PSK]);
+	if (tb[WLCORE_VENDOR_ATTR_PSK]) {
+		sc_data->psk = nla_data(tb[WLCORE_VENDOR_ATTR_PSK]);
+		sc_data->psk_len = nla_len(tb[WLCORE_VENDOR_ATTR_PSK]);
 	}
 
 	wpa_supplicant_event(drv->ctx, EVENT_SMART_CONFIG_DECODE, &data);
 }
-
-static void nl80211_testmode_event(struct wpa_driver_nl80211_data *drv,
-				       struct nlattr **tb)
-{
-	struct nlattr *testmode[WL1271_TM_ATTR_MAX];
-	u8 testmode_event;
-
-	wpa_printf(MSG_DEBUG, "nl80211: testmode event");
-
-	if (!tb[NL80211_ATTR_TESTDATA])
-		return;
-
-	if (nla_parse_nested(testmode, WL1271_TM_ATTR_MAX, tb[NL80211_ATTR_TESTDATA],
-			     NULL))
-		return;
-
-	if (!testmode[WL1271_TM_ATTR_SMART_CONFIG_EVENT])
-		return;
-
-	testmode_event = nla_get_u8(testmode[WL1271_TM_ATTR_SMART_CONFIG_EVENT]);
-	switch (testmode_event) {
-	case WLCORE_TM_SC_EVENT_SYNC:
-		nl80211_testmode_sc_sync_event(drv, testmode);
-		break;
-	case WLCORE_TM_SC_EVENT_DECODE:
-		nl80211_testmode_sc_decode_event(drv, testmode);
-		break;
-	default:
-		wpa_printf(MSG_DEBUG, "ERROR - invalid testmode smart config event");
-	}
-}
-
 
 static void nl80211_stop_ap(struct wpa_driver_nl80211_data *drv,
 			    struct nlattr **tb)
@@ -2779,6 +2747,29 @@ static void nl80211_spurious_frame(struct i802_bss *bss, struct nlattr **tb,
 	wpa_supplicant_event(drv->ctx, EVENT_RX_FROM_UNKNOWN, &event);
 }
 
+static void nl80211_vendor_event_ti(struct wpa_driver_nl80211_data *drv,
+				     u32 subcmd, struct nlattr *event_tb)
+{
+	struct nlattr *ti_tb[NUM_WLCORE_VENDOR_ATTR] = {};
+
+	if (event_tb &&
+	    nla_parse_nested(ti_tb, MAX_WLCORE_VENDOR_ATTR, event_tb, NULL))
+		return;
+
+	switch (subcmd) {
+	case WLCORE_VENDOR_EVENT_SC_SYNC:
+		nl80211_vendor_ti_sc_sync_event(drv, ti_tb);
+		break;
+	case WLCORE_VENDOR_EVENT_SC_DECODE:
+		nl80211_vendor_ti_sc_decode_event(drv, ti_tb);
+		break;
+	default:
+		wpa_printf(MSG_DEBUG,
+			   "nl80211: Ignore unsupported TI vendor event %u",
+			   subcmd);
+		break;
+	}
+}
 
 static void nl80211_vendor_event(struct wpa_driver_nl80211_data *drv,
 				 struct nlattr **tb)
@@ -2815,6 +2806,9 @@ static void nl80211_vendor_event(struct wpa_driver_nl80211_data *drv,
 	}
 
 	switch (vendor_id) {
+	case TI_OUI:
+		nl80211_vendor_event_ti(drv, subcmd,
+					tb[NL80211_ATTR_VENDOR_DATA]);
 	default:
 		wpa_printf(MSG_DEBUG, "nl80211: Ignore unsupported vendor event");
 		break;
@@ -2995,10 +2989,6 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 		nl80211_stop_ap(drv, tb);
 		wpa_supplicant_event(drv->ctx, EVENT_INTERFACE_DISABLED, NULL);
 		wpa_supplicant_event(drv->ctx, EVENT_INTERFACE_ENABLED, NULL);
-		break;
-	case NL80211_CMD_TESTMODE:
-		wpa_printf(MSG_DEBUG, "TESTMODE event!");
-		nl80211_testmode_event(drv, tb);
 		break;
 	case NL80211_CMD_VENDOR:
 		nl80211_vendor_event(drv, tb);
@@ -8875,8 +8865,9 @@ static int wpa_driver_nl80211_set_supp_port(void *priv, int authorized)
 	return -ENOBUFS;
 }
 
-static int wpa_driver_nl80211_testmode_cmd(struct wpa_driver_nl80211_data *drv,
-					   struct nl_msg *nested)
+static int wpa_driver_nl80211_vendor_cmd(struct wpa_driver_nl80211_data *drv,
+					 u32 vendor_id, u32 subcmd,
+					 struct nl_msg *nested)
 {
 	struct nl_msg *msg;
 	int ret;
@@ -8885,43 +8876,23 @@ static int wpa_driver_nl80211_testmode_cmd(struct wpa_driver_nl80211_data *drv,
 	if (!msg)
 		return -ENOMEM;
 
-	nl80211_cmd(drv, msg, 0, NL80211_CMD_TESTMODE);
-
+	nl80211_cmd(drv, msg, 0, NL80211_CMD_VENDOR);
 	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, drv->ifindex);
+	NLA_PUT_U32(msg, NL80211_ATTR_VENDOR_ID, vendor_id);
+	NLA_PUT_U32(msg, NL80211_ATTR_VENDOR_SUBCMD, subcmd);
 
-	/* note: we only "put" nested, not consume it */
-	ret = nla_put_nested(msg, NL80211_ATTR_TESTDATA, nested);
-	if (ret < 0)
-		goto nla_put_failure;
+	if (nested) {
+		/* note: we only "put" nested, not consume it */
+		ret = nla_put_nested(msg, NL80211_ATTR_VENDOR_DATA, nested);
+		if (ret < 0)
+			goto nla_put_failure;
+	}
 
 	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
 	if (ret == -ENOENT)
 		return 0;
 	return ret;
  nla_put_failure:
-	nlmsg_free(msg);
-	return -ENOBUFS;
-}
-
-static int wpa_driver_nl80211_testmode_empty_cmd(
-					struct wpa_driver_nl80211_data *drv,
-					int cmd)
-{
-	struct nl_msg *msg;
-	int ret;
-
-	msg = nlmsg_alloc();
-	if (!msg)
-		return -ENOMEM;
-
-	NLA_PUT_U32(msg, WL1271_TM_ATTR_CMD_ID, cmd);
-
-	ret = wpa_driver_nl80211_testmode_cmd(drv, msg);
-
-	/* we still need to free our nested message */
-	nlmsg_free(msg);
-	return ret;
-nla_put_failure:
 	nlmsg_free(msg);
 	return -ENOBUFS;
 }
@@ -11787,11 +11758,11 @@ static int nl80211_testmode_cmd_smart_config_start(
 	if (!msg)
 		return -ENOMEM;
 
-	NLA_PUT_U32(msg, WL1271_TM_ATTR_CMD_ID,
-		    WL1271_TM_CMD_SMART_CONFIG_START);
-	NLA_PUT_U32(msg, WL1271_TM_ATTR_GROUP_ID, group_bitmap);
+	NLA_PUT_U32(msg, WLCORE_VENDOR_ATTR_GROUP_ID, group_bitmap);
 
-	ret = wpa_driver_nl80211_testmode_cmd(drv, msg);
+	ret = wpa_driver_nl80211_vendor_cmd(drv,
+			TI_OUI, WLCORE_VENDOR_CMD_SMART_CONFIG_START,
+			msg);
 
 	/* we still need to free our nested message */
 	nlmsg_free(msg);
@@ -11831,13 +11802,12 @@ static int nl80211_testmode_cmd_set_group_key(
 	if (!msg)
 		return -ENOMEM;
 
-	NLA_PUT_U32(msg, WL1271_TM_ATTR_CMD_ID,
-		    WL1271_TM_CMD_SMART_CONFIG_SET_GROUP_KEY);
+	NLA_PUT_U32(msg, WLCORE_VENDOR_ATTR_GROUP_ID, group_id);
+	NLA_PUT(msg, WLCORE_VENDOR_ATTR_GROUP_KEY, key_len, key);
 
-	NLA_PUT_U32(msg, WL1271_TM_ATTR_GROUP_ID, group_id);
-	NLA_PUT(msg, WL1271_TM_ATTR_GROUP_KEY, key_len, key);
-
-	ret = wpa_driver_nl80211_testmode_cmd(drv, msg);
+	ret = wpa_driver_nl80211_vendor_cmd(drv,
+			TI_OUI, WLCORE_VENDOR_CMD_SMART_CONFIG_SET_GROUP_KEY,
+			msg);
 
 	/* we still need to free our nested message */
 	nlmsg_free(msg);
@@ -11884,8 +11854,9 @@ static int wpa_driver_nl80211_driver_cmd(void *priv, char *cmd, char *buf,
 		ret = nl80211_smart_config_start(drv, buf);
 	} else if (os_strcasecmp(cmd, "SMART_CONFIG_STOP") == 0) {
 		wpa_printf(MSG_DEBUG, "Send testmode SMART_CONFIG_STOP cmd");
-		ret = wpa_driver_nl80211_testmode_empty_cmd(drv,
-				WL1271_TM_CMD_SMART_CONFIG_STOP);
+		ret = wpa_driver_nl80211_vendor_cmd(drv,
+			TI_OUI, WLCORE_VENDOR_CMD_SMART_CONFIG_STOP,
+			NULL);
 	} else if (os_strcasecmp(cmd, "SMART_CONFIG_SET_GROUP_KEY") == 0) {
 		ret = nl80211_smart_config_set_group_key(drv, buf);
 	} else {
