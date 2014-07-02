@@ -3358,6 +3358,109 @@ static void wpa_supplicant_event_assoc_auth(struct wpa_supplicant *wpa_s,
 			       data->assoc_info.ptk_kek_len);
 }
 
+static struct wpa_ssid *
+_wpa_sc_add_network(struct wpa_supplicant *wpa_s,
+		    u8 *_ssid, u8 ssid_len,
+		    u8 *psk, u8 psk_len,
+		    int  wep)
+{
+	struct wpa_ssid *ssid;
+	char buf[64];
+
+	ssid = wpa_config_add_network(wpa_s->conf);
+	if (ssid == NULL)
+		return NULL;
+
+	wpas_notify_network_added(wpa_s, ssid);
+	wpa_config_set_network_defaults(ssid);
+	ssid->disabled = 1;
+
+	os_memset(buf, 0, sizeof(buf));
+	os_memcpy(buf, _ssid, ssid_len);
+	if (wpa_config_set_quoted(ssid, "ssid", buf) < 0)
+		goto fail;
+
+	if (!psk_len) {
+		wpa_config_set(ssid, "key_mgmt", "NONE", 0);
+	} else {
+		os_memset(buf, 0, sizeof(buf));
+		os_memcpy(buf, psk, psk_len);
+
+		if (wep) {
+			if (wpa_config_set(ssid, "key_mgmt", "NONE", 0) ||
+			    wpa_config_set(ssid, "wep_key0", buf, 0) ||
+			    wpa_config_set(ssid, "wep_tx_keyidx", "0", 0))
+			goto fail;
+		} else {
+			if (wpa_config_set(ssid, "key_mgmt", "WPA-PSK", 0) ||
+			    wpa_config_set_quoted(ssid, "psk", buf))
+			goto fail;
+
+			wpa_config_update_psk(ssid);
+		}
+	}
+
+	/* support hidden ssids as well */
+	ssid->scan_ssid = 1;
+
+	ssid->disabled = 0;
+
+	return ssid;
+fail:
+	wpa_printf(MSG_ERROR, "%s: error adding new nework", __func__);
+	wpas_notify_network_removed(wpa_s, ssid);
+	wpa_config_remove_network(wpa_s->conf, ssid->id);
+	return NULL;
+}
+
+
+static int is_hex_key(u8 *str, int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++) {
+		char c = str[i];
+		if (!((c >= '0' && c <= '9') ||
+		      (c >= 'a' && c <= 'f') ||
+		      (c >= 'A' && c <= 'F')))
+			return 0;
+	}
+	return 1;
+}
+
+
+/* return number of added networks */
+static int
+wpa_sc_add_network(struct wpa_supplicant *wpa_s,
+		   u8 *_ssid, u8 ssid_len,
+		   u8 *psk, u8 psk_len)
+{
+	int added = 0;
+
+	if (!_wpa_sc_add_network(wpa_s, _ssid, ssid_len, psk, psk_len, 0))
+		return added;
+	added++;
+
+	if (psk && is_hex_key(psk, psk_len) && (psk_len == 10 || psk_len == 26)) {
+		if (!_wpa_sc_add_network(wpa_s, _ssid, ssid_len, psk, psk_len, 1))
+			return added;
+		added++;
+	}
+
+	return added;
+}
+
+static struct wpa_supplicant *wpa_sc_get_iface(struct wpa_supplicant *wpa_s)
+{
+	struct wpa_supplicant *ifs;
+
+	dl_list_for_each(ifs, &wpa_s->radio->ifaces, struct wpa_supplicant,
+			 radio_list) {
+		if (ifs->smart_config_in_sync || ifs->smart_config_freq)
+			return ifs;
+	}
+	return NULL;
+}
 
 void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			  union wpa_event_data *data)
@@ -3809,6 +3912,14 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			data->remain_on_channel.duration);
 		break;
 	case EVENT_CANCEL_REMAIN_ON_CHANNEL:
+		if (wpa_s->smart_config_freq) {
+			/* do it forever... */
+			wpa_printf(MSG_DEBUG, "ROC again... (forever)");
+			wpa_drv_remain_on_channel(wpa_s,
+						  wpa_s->smart_config_freq,
+						  wpa_s->max_remain_on_chan);
+			break;
+		}
 #ifdef CONFIG_OFFCHANNEL
 		offchannel_cancel_remain_on_channel_cb(
 			wpa_s, data->remain_on_channel.freq);
@@ -3971,6 +4082,16 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED)
 			break;
 
+		if (wpa_s->smart_config_in_sync) {
+			wpa_s->scan_req = MANUAL_SCAN_REQ;
+			wpa_supplicant_req_sched_scan(wpa_s);
+		}
+
+		if (wpa_s->smart_config_freq)
+			wpa_drv_remain_on_channel(wpa_s,
+						  wpa_s->smart_config_freq,
+						  wpa_s->max_remain_on_chan);
+
 		/*
 		 * Start a new sched scan to continue searching for more SSIDs
 		 * either if timed out or PNO schedule scan is pending.
@@ -4028,6 +4149,77 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 					     &data->acs_selected_channels);
 #endif /* CONFIG_ACS */
 		break;
+	case EVENT_SMART_CONFIG_SYNC: {
+		u32 freq = data->smart_config_sync.freq;
+		struct wpa_supplicant *ifs = wpa_sc_get_iface(wpa_s);
+
+		wpa_dbg(wpa_s, MSG_DEBUG, "event smart config sync, freq = %d",
+			freq);
+
+		if (!ifs || !ifs->smart_config_in_sync) {
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"ignore EVENT_SMART_CONFIG_SYNC event while "
+				"not in sync stage.");
+			break;
+		}
+
+		/* update wpa_s with the actual iface */
+		wpa_s = ifs;
+
+		/* don't start any new scan */
+		wpa_s->smart_config_in_sync = 0;
+
+		wpa_msg_ctrl(wpa_s, MSG_INFO, SMART_CONFIG_EVENT_SYNCED);
+
+		/* stop any ongoing scan */
+		wpa_supplicant_cancel_sched_scan(wpa_s);
+		wpa_supplicant_cancel_scan(wpa_s);
+
+		/* save the sync channel */
+		wpa_s->smart_config_freq = freq;
+
+		/*
+		 * roc on it now only if sched_scan is not running. otherwise,
+		 * it will be initiated on sched_scan stop event.
+		 */
+		if (!wpa_s->sched_scanning)
+			wpa_drv_remain_on_channel(wpa_s, freq,
+						  wpa_s->max_remain_on_chan);
+		break;
+	}
+	case EVENT_SMART_CONFIG_DECODE: {
+		struct smart_config_decode *sc_data = &data->smart_config_decode;
+		struct wpa_supplicant *ifs = wpa_sc_get_iface(wpa_s);
+
+
+		if (!ifs || !ifs->smart_config_freq) {
+			wpa_dbg(wpa_s, MSG_ERROR,
+				"ignore SMART_CONFIG_DECODE event while "
+				"not in decoding stage.");
+			break;
+		}
+
+		/* update wpa_s with the actual iface */
+		wpa_s = ifs;
+
+		/* smart config completed. stop it */
+		wpa_supplicant_smart_config_stop(wpa_s);
+
+		/* add the new found network */
+		wpa_sc_add_network(wpa_s,
+				   sc_data->ssid, sc_data->ssid_len,
+				   sc_data->psk, sc_data->psk_len);
+
+		if (wpa_s->conf->update_config)
+			wpa_config_write(wpa_s->confname, wpa_s->conf);
+
+		wpa_msg_ctrl(wpa_s, MSG_INFO, SMART_CONFIG_EVENT_DECODED);
+
+		/* trigger a scan to find the new configured network */
+		wpa_supplicant_req_scan(wpa_s, 0, 0);
+
+		break;
+	}
 	default:
 		wpa_msg(wpa_s, MSG_INFO, "Unknown event %d", event);
 		break;

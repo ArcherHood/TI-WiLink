@@ -37,6 +37,7 @@
 #include "radiotap_iter.h"
 #include "rfkill.h"
 #include "driver_nl80211.h"
+#include "ti_vendor_cmd.h"
 
 
 #ifndef CONFIG_LIBNL20
@@ -5270,6 +5271,37 @@ static int wpa_driver_nl80211_set_supp_port(void *priv, int authorized)
 	return ret;
 }
 
+static int wpa_driver_nl80211_vendor_cmd(struct wpa_driver_nl80211_data *drv,
+					 u32 vendor_id, u32 subcmd,
+					 struct nl_msg *nested)
+{
+	struct nl_msg *msg;
+	int ret;
+
+	msg = nlmsg_alloc();
+	if (!msg)
+		return -ENOMEM;
+
+	nl80211_cmd(drv, msg, 0, NL80211_CMD_VENDOR);
+	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, drv->ifindex);
+	NLA_PUT_U32(msg, NL80211_ATTR_VENDOR_ID, vendor_id);
+	NLA_PUT_U32(msg, NL80211_ATTR_VENDOR_SUBCMD, subcmd);
+
+	if (nested) {
+		/* note: we only "put" nested, not consume it */
+		ret = nla_put_nested(msg, NL80211_ATTR_VENDOR_DATA, nested);
+		if (ret < 0)
+			goto nla_put_failure;
+	}
+
+	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
+	if (ret == -ENOENT)
+		return 0;
+	return ret;
+ nla_put_failure:
+	nlmsg_free(msg);
+	return -ENOBUFS;
+}
 
 /* Set kernel driver on given frequency (MHz) */
 static int i802_set_freq(void *priv, struct hostapd_freq_params *freq)
@@ -7584,6 +7616,126 @@ nl80211_tdls_disable_channel_switch(void *priv, const u8 *addr)
 
 #endif /* CONFIG TDLS */
 
+static int nl80211_testmode_cmd_smart_config_start(
+				struct wpa_driver_nl80211_data *drv,
+				u16 group_bitmap)
+{
+	struct nl_msg *msg;
+	int ret;
+
+	msg = nlmsg_alloc();
+	if (!msg)
+		return -ENOMEM;
+
+	NLA_PUT_U32(msg, WLCORE_VENDOR_ATTR_GROUP_ID, group_bitmap);
+
+	ret = wpa_driver_nl80211_vendor_cmd(drv,
+			TI_OUI, WLCORE_VENDOR_CMD_SMART_CONFIG_START,
+			msg);
+
+	/* we still need to free our nested message */
+	nlmsg_free(msg);
+	return ret;
+nla_put_failure:
+	nlmsg_free(msg);
+	return -ENOBUFS;
+}
+
+static int
+nl80211_smart_config_start(struct wpa_driver_nl80211_data *drv,
+			   const char *buf)
+{
+	char *endp;
+	unsigned long group_id;
+
+	/* buf = <group_id> */
+	group_id = strtoul(buf, &endp, 0);
+	if (buf == endp || *endp != '\0')
+		return -1;
+
+	wpa_printf(MSG_DEBUG, "group_id: %ld", group_id);
+	wpa_printf(MSG_DEBUG, "Send testmode SMART_CONFIG_START cmd");
+
+	return nl80211_testmode_cmd_smart_config_start(drv, group_id);
+}
+
+static int nl80211_testmode_cmd_set_group_key(
+				struct wpa_driver_nl80211_data *drv,
+				u16 group_id,
+				int key_len, const char *key)
+{
+	struct nl_msg *msg;
+	int ret;
+
+	msg = nlmsg_alloc();
+	if (!msg)
+		return -ENOMEM;
+
+	NLA_PUT_U32(msg, WLCORE_VENDOR_ATTR_GROUP_ID, group_id);
+	NLA_PUT(msg, WLCORE_VENDOR_ATTR_GROUP_KEY, key_len, key);
+
+	ret = wpa_driver_nl80211_vendor_cmd(drv,
+			TI_OUI, WLCORE_VENDOR_CMD_SMART_CONFIG_SET_GROUP_KEY,
+			msg);
+
+	/* we still need to free our nested message */
+	nlmsg_free(msg);
+	return ret;
+nla_put_failure:
+	nlmsg_free(msg);
+	return -ENOBUFS;
+}
+
+static int
+nl80211_smart_config_set_group_key(struct wpa_driver_nl80211_data *drv,
+				   const char *buf)
+{
+	char *endp;
+	long group_id;
+
+	/* buf = <group_id> <key> */
+	group_id = strtol(buf, &endp, 10);
+
+	if (buf == endp || *endp != ' ' || group_id < 0)
+		return -1;
+
+	/* skip spaces */
+	while (*endp == ' ')
+		endp++;
+
+	wpa_printf(MSG_DEBUG, "group_id: %ld, key_len: %d, key: %s",
+		   group_id, (int)strlen(endp), endp);
+	wpa_printf(MSG_DEBUG, "Send testmode SMART_CONFIG_SET_GROUP_KEY cmd");
+
+	return nl80211_testmode_cmd_set_group_key(drv, group_id,
+						  os_strlen(endp), endp);
+}
+
+static int wpa_driver_nl80211_driver_cmd(void *priv, char *cmd, char *buf,
+					 size_t buf_len)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	int ret = -1;
+
+	if (os_strcasecmp(cmd, "SMART_CONFIG_START") == 0) {
+		wpa_printf(MSG_DEBUG, "Send testmode SMART_CONFIG_START cmd");
+		ret = nl80211_smart_config_start(drv, buf);
+	} else if (os_strcasecmp(cmd, "SMART_CONFIG_STOP") == 0) {
+		wpa_printf(MSG_DEBUG, "Send testmode SMART_CONFIG_STOP cmd");
+		ret = wpa_driver_nl80211_vendor_cmd(drv,
+			TI_OUI, WLCORE_VENDOR_CMD_SMART_CONFIG_STOP,
+			NULL);
+	} else if (os_strcasecmp(cmd, "SMART_CONFIG_SET_GROUP_KEY") == 0) {
+		ret = nl80211_smart_config_set_group_key(drv, buf);
+	} else {
+#ifdef ANDROID
+	ret = wpa_driver_nl80211_driver_cmd_android(priv, cmd, buf, buf_len);
+#endif
+	}
+	return ret;
+}
+
 
 static int driver_nl80211_set_key(const char *ifname, void *priv,
 				  enum wpa_alg alg, const u8 *addr,
@@ -9320,11 +9472,7 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.get_noa = wpa_driver_get_p2p_noa,
 	.set_ap_wps_ie = wpa_driver_set_ap_wps_p2p_ie,
 #endif /* ANDROID_P2P */
-#ifdef ANDROID
-#ifndef ANDROID_LIB_STUB
 	.driver_cmd = wpa_driver_nl80211_driver_cmd,
-#endif /* !ANDROID_LIB_STUB */
-#endif /* ANDROID */
 	.vendor_cmd = nl80211_vendor_cmd,
 	.set_qos_map = nl80211_set_qos_map,
 	.set_wowlan = nl80211_set_wowlan,

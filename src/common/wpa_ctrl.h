@@ -276,6 +276,10 @@ extern "C" {
 /* BSS Transition Management Request received with MBO transition reason */
 #define MBO_TRANSITION_REASON "MBO-TRANSITION-REASON "
 
+/* smart config events */
+#define SMART_CONFIG_EVENT_SYNCED "SMART-CONFIG-SYNC-COMPLETE "
+#define SMART_CONFIG_EVENT_DECODED "SMART-CONFIG-SUCCESS "
+
 /* BSS command information masks */
 
 #define WPA_BSS_MASK_ALL		0xFFFDFFFF
