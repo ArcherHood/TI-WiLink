@@ -639,8 +639,14 @@ struct wpa_supplicant {
 	} scan_req, last_scan_req;
 	enum wpa_states scan_prev_wpa_state;
 	struct os_reltime scan_trigger_time, scan_start_time;
-	/* Minimum freshness requirement for connection purposes */
+	
+        /* Minimum freshness requirement for connection purposes */
 	struct os_reltime scan_min_time;
+
+	/* smart config params */
+	int smart_config_in_sync; /* SC trying to sync on channel */
+	int smart_config_freq; /* SC frequency to try decode on */
+
 	int scan_runs; /* number of scan runs since WPS was started */
 	int *next_scan_freqs;
 	int *manual_scan_freqs;
@@ -1098,6 +1104,11 @@ void wpa_supplicant_req_auth_timeout(struct wpa_supplicant *wpa_s,
 void wpa_supplicant_reinit_autoscan(struct wpa_supplicant *wpa_s);
 void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 			      enum wpa_states state);
+int wpa_supplicant_smart_config_start(struct wpa_supplicant *wpa_s,
+				      const char *buf);
+int wpa_supplicant_smart_config_stop(struct wpa_supplicant *wpa_s);
+int wpa_supplicant_smart_config_set_group_id(struct wpa_supplicant *wpa_s,
+					     const char *buf);
 struct wpa_ssid * wpa_supplicant_get_ssid(struct wpa_supplicant *wpa_s);
 const char * wpa_supplicant_get_eap_mode(struct wpa_supplicant *wpa_s);
 void wpa_supplicant_cancel_auth_timeout(struct wpa_supplicant *wpa_s);

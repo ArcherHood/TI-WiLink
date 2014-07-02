@@ -2994,7 +2994,6 @@ struct wpa_driver_ops {
 	 */
 	int (*set_authmode)(void *priv, int authmode);
 
-#ifdef ANDROID
 	/**
 	 * driver_cmd - Execute driver-specific command
 	 * @priv: Private driver interface data
@@ -3004,7 +3003,6 @@ struct wpa_driver_ops {
 	 * Returns: 0 on success, -1 on failure
 	 */
 	int (*driver_cmd)(void *priv, char *cmd, char *buf, size_t buf_len);
-#endif /* ANDROID */
 
 	/**
 	 * vendor_cmd - Execute vendor specific command
@@ -4061,6 +4059,9 @@ enum wpa_event_type {
 	 * on a DFS frequency by a driver that supports DFS Offload.
 	 */
 	EVENT_DFS_CAC_STARTED,
+
+	EVENT_SMART_CONFIG_SYNC,
+	EVENT_SMART_CONFIG_DECODE,
 };
 
 
@@ -4780,6 +4781,18 @@ union wpa_event_data {
 		u16 ch_width;
 		enum hostapd_hw_mode hw_mode;
 	} acs_selected_channels;
+
+	struct smart_config_sync {
+		u32 freq;
+	} smart_config_sync;
+
+	struct smart_config_decode {
+		u8 *ssid;
+		u8 ssid_len;
+
+		u8 *psk;
+		u8 psk_len;
+	} smart_config_decode;
 };
 
 /**
