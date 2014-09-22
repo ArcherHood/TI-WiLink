@@ -5168,6 +5168,20 @@ static int wpas_p2p_setup_freqs(struct wpa_supplicant *wpa_s, int freq,
 		   "P2P: Setup freqs: freq=%d num_MCC=%d shared_freqs=%u num_unused=%d",
 		   freq, wpa_s->num_multichan_concurrent, num, num_unused);
 
+	/* find used frequencies by other hostapd processes */
+	if (!num) {
+		struct wpa_channel_info info;
+
+		if (wpa_drv_shared_ap_freq(wpa_s, &info) == 1) {
+			wpa_printf(MSG_DEBUG,
+				   "P2P: Prefer freq %d used by other ap interfaces",
+				   info.frequency);
+			num = 1;
+			freqs[0].freq = info.frequency;
+			freqs[0].flags = WPA_FREQ_USED_BY_INFRA_STATION;
+		}
+	}
+
 	if (freq > 0) {
 		int ret;
 		if (go)
@@ -5768,6 +5782,7 @@ static int wpas_p2p_init_go_params(struct wpa_supplicant *wpa_s,
 				   int vht, int max_oper_chwidth,
 				   const struct p2p_channels *channels)
 {
+	struct wpa_channel_info info;
 	struct wpa_used_freq_data *freqs;
 	unsigned int cand;
 	unsigned int num, i;
@@ -5780,6 +5795,23 @@ static int wpas_p2p_init_go_params(struct wpa_supplicant *wpa_s,
 	params->vht = vht;
 	params->max_oper_chwidth = max_oper_chwidth;
 	params->vht_center_freq2 = vht_center_freq2;
+
+	/* sync with other running APs (unconditionally for now) */
+	if (wpa_drv_shared_ap_freq(wpa_s, &info) == 1) {
+		u8 chan;
+        int hw_mode = ieee80211_freq_to_chan(info.frequency, &chan);
+
+        if (hw_mode == NUM_HOSTAPD_MODES) {
+			wpa_printf(MSG_ERROR, "Shared AP freq bad channel");
+			return -3;
+        }
+
+        params->freq = info.frequency;
+        params->ht40 = info.sec_channel_offset != 0; /* TODO: do we want it? */
+        wpa_printf(MSG_DEBUG, "Channel automatically synced to "
+			"existing AP: %d (ht40=%d)", chan, ht40);
+        return 0;
+	}
 
 	freqs = os_calloc(wpa_s->num_multichan_concurrent,
 			  sizeof(struct wpa_used_freq_data));
