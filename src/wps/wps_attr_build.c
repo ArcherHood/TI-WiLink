@@ -288,7 +288,6 @@ int wps_build_auth_type_flags(struct wps_data *wps, struct wpabuf *msg)
 	auth_types &= ~WPS_AUTH_WPA;
 	auth_types &= ~WPS_AUTH_WPA2;
 #ifdef CONFIG_WPS2
-	auth_types &= ~WPS_AUTH_WPAPSK;
 	auth_types &= ~WPS_AUTH_SHARED;
 #endif /* CONFIG_WPS2 */
 	wpa_printf(MSG_DEBUG, "WPS:  * Authentication Type Flags");
