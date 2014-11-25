@@ -961,7 +961,11 @@ static int valid_ap_channel(struct hostapd_iface *iface, int chan)
 	/* don't allow AP on channel 14 - only JP 11b rates */
 	if (chan == 14)
 		return 0;
-		
+
+	/* don't allow JP-only channels */
+	if (chan == 38 || chan == 42)
+		return 0;
+
 	/* don't allow channels on the the ACS blacklist */
 	if (iface->conf->acs_blacklist) {
 		list = iface->conf->acs_blacklist;
