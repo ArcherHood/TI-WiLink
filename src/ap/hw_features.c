@@ -474,10 +474,19 @@ static void ap_ht40_scan_retry(void *eloop_data, void *user_data)
 	hostapd_setup_interface_complete(iface, 0);
 }
 
+static int hostapd_auto_select_channel(struct hostapd_iface *iface);
+static void hostapd_acs_scan_retry(void *eloop_data, void *user_data)
+{
+	struct hostapd_iface *iface = eloop_data;
+
+	hostapd_auto_select_channel(iface);
+}
+
 
 void hostapd_stop_setup_timers(struct hostapd_iface *iface)
 {
 	eloop_cancel_timeout(ap_ht40_scan_retry, iface, NULL);
+	eloop_cancel_timeout(hostapd_acs_scan_retry, iface, NULL);
 }
 
 
@@ -1189,13 +1198,22 @@ free_chans:
 
 static int hostapd_auto_select_channel(struct hostapd_iface *iface)
 {
-
+	int ret;
 	struct wpa_driver_scan_params params;
 
 	/* TODO: we can scan only the current HW mode */
 	wpa_printf(MSG_DEBUG, "Scan for neighboring BSSes to select channel");
 	os_memset(&params, 0, sizeof(params));
-	if (hostapd_driver_scan(iface->bss[0], &params) < 0) {
+	ret = hostapd_driver_scan(iface->bss[0], &params);
+	if (ret == -EBUSY) {
+		wpa_printf(MSG_DEBUG,
+			   "Failed to request a scan of neighboring BSSes - try again");
+		eloop_register_timeout(1, 0, hostapd_acs_scan_retry,
+				       iface, NULL);
+		return 0;
+	}
+
+	if (ret < 0) {
 		wpa_printf(MSG_ERROR, "Failed to request a scan of "
 			   "neighboring BSSes");
 		return -1;
