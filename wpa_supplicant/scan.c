@@ -1298,7 +1298,7 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 	if (wildcard)
 		need_ssids++;
 
-	if (wpa_s->normal_scans < 3 &&
+	if (wpa_s->normal_scans < 3 && !wpa_s->smart_config_in_sync &&
 	    (need_ssids <= wpa_s->max_scan_ssids ||
 	     wpa_s->max_scan_ssids >= (int) max_sched_scan_ssids)) {
 		/*
