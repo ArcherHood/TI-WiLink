@@ -5293,6 +5293,9 @@ static int wpas_p2p_init_go_params(struct wpa_supplicant *wpa_s,
 		return 0;
 	}
 
+	if (!wpa_s->parent->conf->p2p_ignore_shared_freq)
+		return 0;
+
 	freqs = os_calloc(wpa_s->num_multichan_concurrent,
 			  sizeof(struct wpa_used_freq_data));
 	if (!freqs)
