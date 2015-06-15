@@ -4535,6 +4535,9 @@ static int wpas_check_freq_conflict(struct wpa_supplicant *wpa_s, int freq)
 		return 0;
 	}
 
+	if (!wpa_s->parent->conf->p2p_ignore_shared_freq)
+		return 0;
+
 	freqs = os_calloc(wpa_s->num_multichan_concurrent,
 			  sizeof(struct wpa_used_freq_data));
 	if (!freqs)
