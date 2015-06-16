@@ -163,6 +163,8 @@ wpas_p2p_consider_moving_gos(struct wpa_supplicant *wpa_s,
 			     struct wpa_used_freq_data *freqs, unsigned int num,
 			     enum wpas_p2p_channel_update_trig trig);
 static void wpas_p2p_reconsider_moving_go(void *eloop_ctx, void *timeout_ctx);
+static void wpas_p2p_scan_res_ignore_search(struct wpa_supplicant *wpa_s,
+					    struct wpa_scan_results *scan_res);
 
 
 /*
@@ -359,6 +361,16 @@ static int wpas_p2p_scan(void *ctx, enum p2p_scan_type type, int freq,
 
 	if (wpa_s->p2p_scan_work) {
 		wpa_dbg(wpa_s, MSG_INFO, "P2P: Reject scan trigger since one is already pending");
+		if (wpa_s->scan_res_handler == wpas_p2p_scan_res_ignore_search) {
+			/*
+			 * If a p2p_find was started right after a previous
+			 * p2p_find was stopped, the scan result handler
+			 * might have been set to ignore the scan results.
+			 * reconfigure it in this case.
+			 */
+			wpa_dbg(wpa_s, MSG_INFO, "P2P: Consider scan results of previously issued p2p scan");
+			wpa_s->scan_res_handler = wpas_p2p_scan_res_handler;
+		}
 		return -1;
 	}
 
