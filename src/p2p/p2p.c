@@ -1156,9 +1156,10 @@ int p2p_find(struct p2p_data *p2p, unsigned int timeout,
 	int res;
 
 	p2p_dbg(p2p, "Starting find (type=%d)", type);
-	os_get_reltime(&p2p->find_start);
 	if (p2p->p2p_scan_running) {
 		p2p_dbg(p2p, "p2p_scan is already running");
+	} else {
+		os_get_reltime(&p2p->find_start);
 	}
 
 	p2p_free_req_dev_types(p2p);
