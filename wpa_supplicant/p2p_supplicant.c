@@ -127,7 +127,8 @@ static int wpas_p2p_join_start(struct wpa_supplicant *wpa_s, int freq,
 static int wpas_p2p_setup_freqs(struct wpa_supplicant *wpa_s, int freq,
 				int *force_freq, int *pref_freq, int go,
 				unsigned int *pref_freq_list,
-				unsigned int *num_pref_freq);
+				unsigned int *num_pref_freq, 
+				int *running_ap);
 static void wpas_p2p_join_scan_req(struct wpa_supplicant *wpa_s, int freq,
 				   const u8 *ssid, size_t ssid_len);
 static void wpas_p2p_join_scan(void *eloop_ctx, void *timeout_ctx);
@@ -223,7 +224,8 @@ wpas_p2p_valid_oper_freqs(struct wpa_supplicant *wpa_s,
 
 
 static void wpas_p2p_set_own_freq_preference(struct wpa_supplicant *wpa_s,
-					     int freq)
+					     int freq,
+					     int running_ap)
 {
 	if (wpa_s->global->p2p_disabled || wpa_s->global->p2p == NULL)
 		return;
@@ -231,7 +233,7 @@ static void wpas_p2p_set_own_freq_preference(struct wpa_supplicant *wpa_s,
 	/* Use the wpa_s used to control the P2P Device operation */
 	wpa_s = wpa_s->global->p2p_init_wpa_s;
 
-	if (wpa_s->conf->p2p_ignore_shared_freq &&
+	if (wpa_s->conf->p2p_ignore_shared_freq && !running_ap &&
 	    freq > 0 && wpa_s->num_multichan_concurrent > 1 &&
 	    wpas_p2p_num_unused_channels(wpa_s) > 0) {
 		wpa_printf(MSG_DEBUG, "P2P: Ignore own channel preference %d MHz due to p2p_ignore_shared_freq=1 configuration",
@@ -638,6 +640,7 @@ static u8 p2ps_group_capability(void *ctx, u8 incoming, u8 role,
 	struct wpa_ssid *persistent_go;
 	int p2p_no_group_iface;
 	unsigned int pref_freq_list[P2P_MAX_PREF_CHANNELS], size;
+	int running_ap;
 
 	wpa_printf(MSG_DEBUG, "P2P: Conncap - in:%d role:%d", incoming, role);
 
@@ -649,10 +652,10 @@ static u8 p2ps_group_capability(void *ctx, u8 incoming, u8 role,
 	size = P2P_MAX_PREF_CHANNELS;
 	if (force_freq && pref_freq &&
 	    !wpas_p2p_setup_freqs(wpa_s, 0, (int *) force_freq,
-				  (int *) pref_freq, 0, pref_freq_list, &size))
+				  (int *) pref_freq, 0, pref_freq_list, &size, &running_ap))
 		wpas_p2p_set_own_freq_preference(wpa_s,
 						 *force_freq ? *force_freq :
-						 *pref_freq);
+						 *pref_freq, running_ap);
 
 	/*
 	 * For non-concurrent capable devices:
@@ -2950,7 +2953,7 @@ static u8 wpas_invitation_process(void *ctx, const u8 *sa, const u8 *bssid,
 	}
 
 accept_inv:
-	wpas_p2p_set_own_freq_preference(wpa_s, 0);
+	wpas_p2p_set_own_freq_preference(wpa_s, 0, 0);
 
 	best_freq = 0;
 	freqs = os_calloc(wpa_s->num_multichan_concurrent,
@@ -2965,7 +2968,7 @@ accept_inv:
 	/* Get one of the frequencies currently in use */
 	if (best_freq > 0) {
 		wpa_printf(MSG_DEBUG, "P2P: Trying to prefer a channel already used by one of the interfaces");
-		wpas_p2p_set_own_freq_preference(wpa_s, best_freq);
+		wpas_p2p_set_own_freq_preference(wpa_s, best_freq, 0);
 
 		if (wpa_s->num_multichan_concurrent < 2 ||
 		    wpas_p2p_num_unused_channels(wpa_s) < 1) {
@@ -5140,7 +5143,8 @@ static int wpas_p2p_join_start(struct wpa_supplicant *wpa_s, int freq,
 static int wpas_p2p_setup_freqs(struct wpa_supplicant *wpa_s, int freq,
 				int *force_freq, int *pref_freq, int go,
 				unsigned int *pref_freq_list,
-				unsigned int *num_pref_freq)
+				unsigned int *num_pref_freq,
+				int *running_ap)
 {
 	struct wpa_used_freq_data *freqs;
 	int res, best_freq, num_unused;
@@ -5169,6 +5173,7 @@ static int wpas_p2p_setup_freqs(struct wpa_supplicant *wpa_s, int freq,
 		   freq, wpa_s->num_multichan_concurrent, num, num_unused);
 
 	/* find used frequencies by other hostapd processes */
+	*running_ap = 0;
 	if (!num) {
 		struct wpa_channel_info info;
 
@@ -5179,6 +5184,7 @@ static int wpas_p2p_setup_freqs(struct wpa_supplicant *wpa_s, int freq,
 			num = 1;
 			freqs[0].freq = info.frequency;
 			freqs[0].flags = WPA_FREQ_USED_BY_INFRA_STATION;
+			*running_ap = 1;
 		}
 	}
 
@@ -5339,6 +5345,7 @@ int wpas_p2p_connect(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 	const u8 *if_addr;
 	struct wpa_ssid *ssid = NULL;
 	unsigned int pref_freq_list[P2P_MAX_PREF_CHANNELS], size;
+	int running_ap;
 
 	if (wpa_s->global->p2p_disabled || wpa_s->global->p2p == NULL)
 		return -1;
@@ -5423,11 +5430,12 @@ int wpas_p2p_connect(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 
 	size = P2P_MAX_PREF_CHANNELS;
 	res = wpas_p2p_setup_freqs(wpa_s, freq, &force_freq, &pref_freq,
-				   go_intent == 15, pref_freq_list, &size);
+				   go_intent == 15, pref_freq_list, &size, &running_ap);
 	if (res)
 		return res;
 	wpas_p2p_set_own_freq_preference(wpa_s,
-					 force_freq ? force_freq : pref_freq);
+					 force_freq ? force_freq : pref_freq,
+					 running_ap);
 
 	p2p_set_own_pref_freq_list(wpa_s->global->p2p, pref_freq_list, size);
 
@@ -6805,6 +6813,7 @@ int wpas_p2p_invite(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 	int res;
 	int no_pref_freq_given = pref_freq == 0;
 	unsigned int pref_freq_list[P2P_MAX_PREF_CHANNELS], size;
+	int running_ap;
 
 	wpa_s->global->p2p_invite_group = NULL;
 	if (peer_addr)
@@ -6846,7 +6855,7 @@ int wpas_p2p_invite(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 	size = P2P_MAX_PREF_CHANNELS;
 	res = wpas_p2p_setup_freqs(wpa_s, freq, &force_freq, &pref_freq,
 				   role == P2P_INVITE_ROLE_GO,
-				   pref_freq_list, &size);
+				   pref_freq_list, &size, &running_ap);
 	if (res)
 		return res;
 
@@ -6886,6 +6895,7 @@ int wpas_p2p_invite_group(struct wpa_supplicant *wpa_s, const char *ifname,
 	struct wpa_ssid *ssid;
 	int persistent;
 	int freq = 0, force_freq = 0, pref_freq = 0;
+	int running_ap;
 	int res;
 	unsigned int pref_freq_list[P2P_MAX_PREF_CHANNELS], size;
 
@@ -6944,10 +6954,10 @@ int wpas_p2p_invite_group(struct wpa_supplicant *wpa_s, const char *ifname,
 	size = P2P_MAX_PREF_CHANNELS;
 	res = wpas_p2p_setup_freqs(wpa_s, freq, &force_freq, &pref_freq,
 				   role == P2P_INVITE_ROLE_ACTIVE_GO,
-				   pref_freq_list, &size);
+				   pref_freq_list, &size, &running_ap);
 	if (res)
 		return res;
-	wpas_p2p_set_own_freq_preference(wpa_s, force_freq);
+	wpas_p2p_set_own_freq_preference(wpa_s, force_freq, running_ap);
 
 	return p2p_invite(wpa_s->global->p2p, peer_addr, role, bssid,
 			  ssid->ssid, ssid->ssid_len, force_freq,
