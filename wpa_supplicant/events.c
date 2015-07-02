@@ -3949,18 +3949,32 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		/* smart config completed. stop it */
 		wpa_supplicant_smart_config_stop(wpa_s);
 
-		/* add the new found network */
-		wpa_sc_add_network(wpa_s,
-				   sc_data->ssid, sc_data->ssid_len,
-				   sc_data->psk, sc_data->psk_len);
+		/* If ssid_len=0 --> FALSE SYNC DETECT, Restart Smart Config  */
+		if(sc_data->ssid_len)
+		{
+			/* add the new found network */
+			wpa_sc_add_network(wpa_s,
+					   sc_data->ssid, sc_data->ssid_len,
+					   sc_data->psk, sc_data->psk_len);
 
-		if (wpa_s->conf->update_config)
-			wpa_config_write(wpa_s->confname, wpa_s->conf);
+			if (wpa_s->conf->update_config)
+				wpa_config_write(wpa_s->confname, wpa_s->conf);
 
-		wpa_msg_ctrl(wpa_s, MSG_INFO, SMART_CONFIG_EVENT_DECODED);
+			wpa_msg_ctrl(wpa_s, MSG_INFO, SMART_CONFIG_EVENT_DECODED);
 
-		/* trigger a scan to find the new configured network */
-		wpa_supplicant_req_scan(wpa_s, 0, 0);
+			/* trigger a scan to find the new configured network */
+			wpa_supplicant_req_scan(wpa_s, 0, 0);
+		}
+		else
+		{
+			wpa_dbg(wpa_s, MSG_INFO,
+				"False SMART_CONFIG_SYNC detect --> Restart Smart Config");
+			if(wpa_supplicant_smart_config_start(wpa_s,
+				wpa_s->smart_config_group_id))
+			{
+				wpa_dbg(wpa_s, MSG_ERROR, "Failed to restart smart config");
+			}
+		}
 
 		break;
 	}

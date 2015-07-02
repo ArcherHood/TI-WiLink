@@ -2868,6 +2868,11 @@ int wpa_supplicant_smart_config_start(struct wpa_supplicant *wpa_s,
 {
 	int ret;
 
+	if(os_strlen(buf) < 3)
+		os_memcpy(wpa_s->smart_config_group_id, buf, os_strlen(buf));
+	else
+		return -1;
+
 	if (wpa_s->smart_config_in_sync || wpa_s->smart_config_freq)
 		return -1;
 

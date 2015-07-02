@@ -594,6 +594,7 @@ struct wpa_supplicant {
 	/* smart config params */
 	int smart_config_in_sync; /* SC trying to sync on channel */
 	int smart_config_freq; /* SC frequency to try decode on */
+	char smart_config_group_id[3]; /* SC configured group ID */
 
 	int scan_runs; /* number of scan runs since WPS was started */
 	int *next_scan_freqs;
