@@ -199,6 +199,7 @@ static void mesh_mpm_init_link(struct wpa_supplicant *wpa_s,
 	 * entry in kernel yet.
 	 */
 	sta->plink_state = PLINK_LISTEN;
+	sta->flags |= WLAN_STA_WMM;
 }
 
 
