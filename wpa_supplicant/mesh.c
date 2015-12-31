@@ -167,6 +167,7 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 	bss->conf->start_disabled = 1;
 	bss->conf->mesh = MESH_ENABLED;
 	bss->conf->ap_max_inactivity = wpa_s->conf->mesh_max_inactivity;
+	bss->conf->disassoc_low_ack = wpa_s->conf->disassoc_low_ack;
 	bss->iconf = conf;
 	ifmsh->conf = conf;
 
