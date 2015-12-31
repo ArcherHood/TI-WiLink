@@ -3873,6 +3873,9 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		if (wpa_s->ap_iface && data)
 			hostapd_event_sta_low_ack(wpa_s->ap_iface->bss[0],
 						  data->low_ack.addr);
+		if (wpa_s->ifmsh && data)
+			hostapd_event_sta_low_ack(wpa_s->ifmsh->bss[0],
+						  data->low_ack.addr);
 #endif /* CONFIG_AP */
 #ifdef CONFIG_TDLS
 		if (data)

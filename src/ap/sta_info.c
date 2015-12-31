@@ -727,8 +727,8 @@ void ap_sta_disassociate(struct hostapd_data *hapd, struct sta_info *sta,
 	sta->disassoc_reason = reason;
 	sta->flags |= WLAN_STA_PENDING_DISASSOC_CB;
 	eloop_cancel_timeout(ap_sta_disassoc_cb_timeout, hapd, sta);
-	eloop_register_timeout(hapd->iface->drv_flags &
-			       WPA_DRIVER_FLAGS_DEAUTH_TX_STATUS ? 2 : 0, 0,
+	eloop_register_timeout((!(hapd->conf->mesh & MESH_ENABLED) &&
+					(hapd->iface->drv_flags & WPA_DRIVER_FLAGS_DEAUTH_TX_STATUS)) ? 2 : 0, 0,
 			       ap_sta_disassoc_cb_timeout, hapd, sta);
 }
 
