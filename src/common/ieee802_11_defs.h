@@ -372,6 +372,12 @@
 #define WLAN_TIMEOUT_KEY_LIFETIME 2
 #define WLAN_TIMEOUT_ASSOC_COMEBACK 3
 
+/* Mesh config info element - capability options*/
+#define	WLAN_MESHCONF_CAPAB_ACCEPT_PLINKS 0x01
+#define	WLAN_MESHCONF_CAPAB_FORWARDING 0x08
+#define	WLAN_MESHCONF_CAPAB_TBTT_ADJUSTING 0x20
+#define	WLAN_MESHCONF_CAPAB_POWER_SAVE_LEVEL 0x40
+
 /* Interworking element (IEEE 802.11u) - Access Network Options */
 #define INTERWORKING_ANO_ACCESS_NETWORK_MASK 0x0f
 #define INTERWORKING_ANO_INTERNET 0x10
@@ -663,6 +669,17 @@ struct ieee80211_ht_operation {
 	le16 operation_mode; /* B8..B23 */
 	le16 param; /* B24..B39 */
 	u8 basic_mcs_set[16];
+} STRUCT_PACKED;
+
+/* Mesh Config element */
+struct ieee80211_mesh_config {
+	u8 psel;
+	u8 pmetric;
+	u8 congest;
+	u8 synch;
+	u8 auth_prot;
+	u8 form_info;
+	u8 capab;
 } STRUCT_PACKED;
 
 
