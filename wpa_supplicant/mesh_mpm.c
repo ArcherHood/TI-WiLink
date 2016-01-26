@@ -724,16 +724,20 @@ void wpa_mesh_new_mesh_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 	struct hostapd_data *data = wpa_s->ifmsh->bss[0];
 	struct sta_info *sta;
 	struct wpa_ssid *ssid = wpa_s->current_ssid;
+	struct ieee80211_mesh_config *mesh_conf_ie =
+		(struct ieee80211_mesh_config *)elems->mesh_config;
 
 	sta = mesh_mpm_add_peer(wpa_s, addr, elems);
 	if (!sta)
 		return;
 
-	if (ssid && ssid->no_auto_peer &&
-	    (is_zero_ether_addr(data->mesh_required_peer) ||
-	     os_memcmp(data->mesh_required_peer, addr, ETH_ALEN) != 0)) {
-		wpa_msg(wpa_s, MSG_INFO, "will not initiate new peer link with "
-			MACSTR " because of no_auto_peer", MAC2STR(addr));
+	/* check if peer accepts new connection. Don't initiate link if peer is full*/
+	if ((ssid && ssid->no_auto_peer &&
+	     (is_zero_ether_addr(data->mesh_required_peer) ||
+	      os_memcmp(data->mesh_required_peer, addr, ETH_ALEN) != 0)) ||
+	    !(mesh_conf_ie->capab & WLAN_MESHCONF_CAPAB_ACCEPT_PLINKS)) {
+		wpa_msg(wpa_s, MSG_ERROR, "will not initiate new peer link with "
+			MACSTR " either no_auto_peer or peer does not allow new links", MAC2STR(addr));
 		if (data->mesh_pending_auth) {
 			struct os_reltime age;
 			const struct ieee80211_mgmt *mgmt;
