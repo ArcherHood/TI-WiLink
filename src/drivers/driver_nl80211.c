@@ -8333,7 +8333,8 @@ static int nl80211_join_mesh(struct i802_bss *bss,
 	if (!(params->conf.flags & WPA_DRIVER_MESH_CONF_FLAG_AUTO_PLINKS) &&
 	    nla_put_u32(msg, NL80211_MESHCONF_AUTO_OPEN_PLINKS, 0))
 		goto fail;
-	if ((params->conf.flags & WPA_DRIVER_MESH_FLAG_DRIVER_MPM) &&
+
+    if (/*(params->conf.flags & WPA_DRIVER_MESH_FLAG_DRIVER_MPM) &&*/
 	    nla_put_u16(msg, NL80211_MESHCONF_MAX_PEER_LINKS,
 			params->max_peer_links))
 		goto fail;
