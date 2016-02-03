@@ -123,7 +123,7 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 	struct hostapd_data *bss;
 	struct hostapd_config *conf;
 	struct mesh_conf *mconf;
-	int basic_rates_erp[] = { 10, 20, 55, 60, 110, 120, 240, -1 };
+	int basic_rates_erp[] = { 60, 120, 240, -1 };
 	static int default_groups[] = { 19, 20, 21, 25, 26, -1 };
 	size_t len;
 	int rate_len;
