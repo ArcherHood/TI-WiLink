@@ -171,7 +171,9 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 	bss->iconf = conf;
 	ifmsh->conf = conf;
 
+    /* set mesh max peer and ap max sta to the same value*/
 	ifmsh->bss[0]->max_plinks = wpa_s->conf->max_peer_links;
+    conf->bss[0]->max_num_sta = wpa_s->conf->max_peer_links;
 	ifmsh->bss[0]->dot11RSNASAERetransPeriod =
 		wpa_s->conf->dot11RSNASAERetransPeriod;
 	os_strlcpy(bss->conf->iface, wpa_s->ifname, sizeof(bss->conf->iface));
