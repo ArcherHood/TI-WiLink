@@ -4246,6 +4246,8 @@ static const struct global_parse_data global_fields[] = {
 	{ INT_RANGE(fst_priority, 1, FST_MAX_PRIO_VALUE), 0 },
 	{ INT_RANGE(fst_llt, 1, FST_MAX_LLT_MS), 0 },
 #endif /* CONFIG_FST */
+	{ INT_RANGE(mesh_on_demand,0,1),0},
+	{ INT_RANGE(signal_threshold,-100,0),-90},
 };
 
 #undef FUNC
