@@ -18,6 +18,8 @@
 #include "driver_i.h"
 #include "mesh_mpm.h"
 #include "mesh_rsn.h"
+#include "config.h"
+#include "../src/drivers/driver_nl80211.h"
 
 struct mesh_peer_mgmt_ie {
 	const u8 *proto_id;
@@ -417,10 +419,13 @@ static void mesh_close_links_timer(void *eloop_ctx, void *user_data)
 		}
 	}
 
-	if ( (wpa_s->ifmsh) && (wpa_s->ifmsh->mesh_deinit_process) )
+	wpa_s->global->mesh_on_demand.anyMeshConnected = FALSE;
+
+	if ( (wpa_s->ifmsh) && (wpa_s->ifmsh->mesh_deinit_process))
 		wpa_supplicant_leave_mesh(wpa_s);
 	
 }
+
 static void plink_timer(void *eloop_ctx, void *user_data)
 {
 	struct wpa_supplicant *wpa_s = eloop_ctx;
@@ -509,7 +514,6 @@ void mesh_mpm_close_links(struct wpa_supplicant *wpa_s, struct hostapd_iface *if
 
 	eloop_register_timeout(0, MESH_CLOSE_LINKS_RESPONSE_TIMER, mesh_close_links_timer, wpa_s, NULL);
 }
-
 
 /* for mesh_rsn to indicate this peer has completed authentication, and we're
  * ready to start AMPE */
@@ -634,16 +638,27 @@ void wpa_mesh_new_mesh_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 	struct sta_info *sta;
 	struct wpa_ssid *ssid = wpa_s->current_ssid;
 	struct ieee80211_mesh_config *mesh_conf_ie =
-		(struct ieee80211_mesh_config *)elems->mesh_config;
+             (struct ieee80211_mesh_config *)elems->mesh_config;
 
 	if (wpa_s->ifmsh->mesh_deinit_process)
 		return;
+	
+	if ( (wpa_s->global->mesh_on_demand.enabled) && (wpa_s->global->mesh_on_demand.meshBlocked) )
+	{
+		wpa_msg(wpa_s, MSG_DEBUG, "mesh_on_demand: wpa_mesh_new_mesh_peer - mesh_block is ON");
+		return;
+	}
 
-    /* check if peer accepts new connection. Don't initiate link if peer is full*/
-    if ((ssid && ssid->no_auto_peer) ||
-		!(mesh_conf_ie->capab & WLAN_MESHCONF_CAPAB_ACCEPT_PLINKS)) {
-		wpa_msg(wpa_s, MSG_ERROR, "will not initiate new peer link with "
-			MACSTR " either no_auto_peer or peer does not allow new links", MAC2STR(addr));
+	sta = mesh_mpm_add_peer(wpa_s, addr, elems);
+	if (!sta)
+		return;
+	
+	/* check if peer accepts new connection. Don't initiate link if peer is full*/
+	if ((ssid && ssid->no_auto_peer) ||
+               !(mesh_conf_ie->capab & WLAN_MESHCONF_CAPAB_ACCEPT_PLINKS)) {
+               wpa_msg(wpa_s, MSG_ERROR, "will not initiate new peer link with "
+                       MACSTR " either no_auto_peer or peer does not allow new links", MAC2STR(addr));
+
 		if (data->mesh_pending_auth) {
 			struct os_reltime age;
 			const struct ieee80211_mgmt *mgmt;
@@ -736,6 +751,8 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 {
 	struct hostapd_data *hapd = wpa_s->ifmsh->bss[0];
 	struct mesh_conf *conf = wpa_s->ifmsh->mconf;
+	struct wpa_supplicant *keep_wpa_s;
+	int found = FALSE;
 	u16 reason = 0;
 
 	wpa_msg(wpa_s, MSG_DEBUG, "MPM " MACSTR " state %s event %s",
@@ -817,6 +834,57 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 			if (conf->security & MESH_CONF_SEC_AMPE)
 				mesh_rsn_derive_mtk(wpa_s, sta);
 			mesh_mpm_plink_estab(wpa_s, sta);
+
+			wpa_msg(wpa_s, MSG_INFO, "=============> PLINK_OPEN_RCVD -> CNF_ACPT ");
+			// we've just got mesh link connected
+			if (wpa_s->global->mesh_on_demand.enabled)
+			{
+				struct i802_bss *bss;
+				struct wpa_driver_nl80211_data *drv;
+
+				wpa_s->global->mesh_on_demand.anyMeshConnected = TRUE;
+				
+				keep_wpa_s = wpa_s->global->ifaces;
+
+				while (keep_wpa_s && !found)
+				{
+					bss = keep_wpa_s->drv_priv;
+					drv = bss->drv;
+					
+					if (drv->nlmode == NL80211_IFTYPE_STATION)						
+						found = TRUE;
+					else
+						keep_wpa_s = keep_wpa_s->next;
+				}
+			}
+				
+			if ( (found) && (keep_wpa_s->wpa_state == WPA_COMPLETED) &&  
+						 (wpa_s->global->mesh_on_demand.meshBlocked == FALSE) )
+			{			
+				struct wpa_ssid *keep_current_ssid;			
+				
+				keep_current_ssid = keep_wpa_s->current_ssid;
+
+				wpa_msg(wpa_s, MSG_INFO, "mesh on demand: disconnect station current SSID is: %s!!!",wpa_ssid_txt(keep_current_ssid->ssid,keep_current_ssid->ssid_len));
+
+				/*
+				* disconnect station from AP 
+				*/
+				keep_wpa_s->reassociate = 0;
+				keep_wpa_s->disconnected = 1;
+				wpa_supplicant_cancel_sched_scan(keep_wpa_s);
+				wpa_supplicant_cancel_scan(keep_wpa_s);
+				wpa_supplicant_deauthenticate(keep_wpa_s,
+							      WLAN_REASON_DEAUTH_LEAVING);
+				eloop_cancel_timeout(wpas_network_reenabled, keep_wpa_s, NULL);
+
+				/*
+				* reselect the network we've just disconnected from and try to reconnect
+				*/ 
+				wpa_supplicant_select_network(keep_wpa_s,keep_current_ssid);
+
+			}
+			
 			break;
 		default:
 			break;
@@ -842,6 +910,8 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 			break;
 		case OPN_ACPT:
 			mesh_mpm_plink_estab(wpa_s, sta);
+
+			wpa_msg(wpa_s, MSG_DEBUG, "PLINK_CNF_RCVD -> OPN_ACPT ");			
 			mesh_mpm_send_plink_action(wpa_s, sta,
 						   PLINK_CONFIRM, 0);
 			break;
@@ -998,6 +1068,12 @@ void mesh_mpm_action_rx(struct wpa_supplicant *wpa_s,
 
 	sta = ap_get_sta(hapd, mgmt->sa);
 
+
+
+	// check if we are currently in a deinit procedure - if that's the case
+	// don't reply and don't add the new peer
+	if (wpa_s->ifmsh->mesh_deinit_process == TRUE)
+		return;
 	/*
 	 * If this is an open frame from an unknown STA, and this is an
 	 * open mesh, then go ahead and add the peer before proceeding.
