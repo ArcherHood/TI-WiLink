@@ -834,7 +834,7 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 				mesh_rsn_derive_mtk(wpa_s, sta);
 			mesh_mpm_plink_estab(wpa_s, sta);
 
-			wpa_msg(wpa_s, MSG_INFO, "=============> PLINK_OPEN_RCVD -> CNF_ACPT ");
+			wpa_msg(wpa_s, MSG_DEBUG, "=============> PLINK_OPEN_RCVD -> CNF_ACPT ");
 			// we've just got mesh link connected
 			if (wpa_s->global->mesh_on_demand.enabled)
 			{
@@ -864,7 +864,7 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 				
 				keep_current_ssid = keep_wpa_s->current_ssid;
 
-				wpa_msg(wpa_s, MSG_INFO, "mesh on demand: disconnect station current SSID is: %s!!!",wpa_ssid_txt(keep_current_ssid->ssid,keep_current_ssid->ssid_len));
+				wpa_msg(wpa_s, MSG_DEBUG, "mesh on demand: disconnect station current SSID is: %s!!!",wpa_ssid_txt(keep_current_ssid->ssid,keep_current_ssid->ssid_len));
 
 				/*
 				* disconnect station from AP 
