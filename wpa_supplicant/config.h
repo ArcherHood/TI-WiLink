@@ -1252,6 +1252,12 @@ struct wpa_config {
 	 * interface.
 	 */
 	int fst_llt;
+
+	/**
+	 * mesh on demand - flag if mesh on demand is enabled 
+	 */
+	int mesh_on_demand;
+	int signal_threshold;
 };
 
 

@@ -242,6 +242,15 @@ struct p2p_srv_upnp {
 	char *service;
 };
 
+struct mesh_on_demand {
+	Boolean  				meshBlocked;
+	Boolean				anyMeshConnected;
+	struct wpa_supplicant *mesh_wpa_s;
+	Boolean				enabled;
+	int					signal_threshold;
+	char 				signal_threshold_name[30];
+};
+
 /**
  * struct wpa_global - Internal, global data for all %wpa_supplicant interfaces
  *
@@ -287,6 +296,9 @@ struct wpa_global {
 #endif /* CONFIG_WIFI_DISPLAY */
 
 	struct psk_list_entry *add_psk; /* From group formation */
+
+	// mesh on demand variables
+	struct mesh_on_demand mesh_on_demand;
 };
 
 
@@ -1035,6 +1047,10 @@ void wpa_clear_keys(struct wpa_supplicant *wpa_s, const u8 *addr);
 void wpa_supplicant_req_auth_timeout(struct wpa_supplicant *wpa_s,
 				     int sec, int usec);
 void wpa_supplicant_reinit_autoscan(struct wpa_supplicant *wpa_s);
+
+void wpa_supplicant_start_bgscan(struct wpa_supplicant *wpa_s);
+void wpa_supplicant_stop_bgscan(struct wpa_supplicant *wpa_s);
+
 void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 			      enum wpa_states state);
 int wpa_supplicant_smart_config_start(struct wpa_supplicant *wpa_s,
