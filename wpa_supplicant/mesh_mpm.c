@@ -727,10 +727,6 @@ void wpa_mesh_new_mesh_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 	struct ieee80211_mesh_config *mesh_conf_ie =
 		(struct ieee80211_mesh_config *)elems->mesh_config;
 
-	sta = mesh_mpm_add_peer(wpa_s, addr, elems);
-	if (!sta)
-		return;
-
 	/* check if peer accepts new connection. Don't initiate link if peer is full*/
 	if ((ssid && ssid->no_auto_peer &&
 	     (is_zero_ether_addr(data->mesh_required_peer) ||
@@ -763,6 +759,10 @@ void wpa_mesh_new_mesh_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 		}
 		return;
 	}
+
+	sta = mesh_mpm_add_peer(wpa_s, addr, elems);
+        if (!sta)
+                return;
 
 	if (conf->security == MESH_CONF_SEC_NONE) {
 		if (sta->plink_state < PLINK_OPEN_SENT ||
