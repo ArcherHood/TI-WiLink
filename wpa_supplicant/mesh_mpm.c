@@ -395,6 +395,32 @@ static void mesh_mpm_fsm_restart(struct wpa_supplicant *wpa_s,
 }
 
 
+static void mesh_close_links_timer(void *eloop_ctx, void *user_data)
+{
+	struct wpa_supplicant *wpa_s = eloop_ctx;
+	struct hostapd_data *hapd = NULL;
+
+	if (wpa_s->ifmsh)
+		hapd = wpa_s->ifmsh->bss[0];
+
+	/*
+	*in case we timed out and not all mesh links were closed appropriately
+	* we now clean all links
+	*/
+
+	if (hapd) {
+		while (hapd->num_plinks > 0) {
+			wpa_msg(wpa_s, MSG_ERROR,"mesh_close_links_timer, num of plinks: %d",hapd->num_plinks );
+
+			hapd->num_plinks--;
+			mesh_mpm_fsm_restart(wpa_s, hapd->sta_list);
+		}
+	}
+
+	if ( (wpa_s->ifmsh) && (wpa_s->ifmsh->mesh_deinit_process) )
+		wpa_supplicant_leave_mesh(wpa_s);
+	
+}
 static void plink_timer(void *eloop_ctx, void *user_data)
 {
 	struct wpa_supplicant *wpa_s = eloop_ctx;
@@ -462,6 +488,7 @@ int mesh_mpm_plink_close(struct hostapd_data *hapd,
 
 	if (sta) {
 		wpa_mesh_set_plink_state(wpa_s, sta, PLINK_HOLDING);
+		hapd->num_plinks--;
 		mesh_mpm_send_plink_action(wpa_s, sta, PLINK_CLOSE, reason);
 		wpa_printf(MSG_DEBUG, "MPM closing plink sta=" MACSTR,
 			   MAC2STR(sta->addr));
@@ -473,15 +500,14 @@ int mesh_mpm_plink_close(struct hostapd_data *hapd,
 }
 
 
-void mesh_mpm_deinit(struct wpa_supplicant *wpa_s, struct hostapd_iface *ifmsh)
+void mesh_mpm_close_links(struct wpa_supplicant *wpa_s, struct hostapd_iface *ifmsh)
 {
 	struct hostapd_data *hapd = ifmsh->bss[0];
 
 	/* notify peers we're leaving */
 	ap_for_each_sta(hapd, mesh_mpm_plink_close, wpa_s);
 
-	hapd->num_plinks = 0;
-	hostapd_free_stas(hapd);
+	eloop_register_timeout(0, MESH_CLOSE_LINKS_RESPONSE_TIMER, mesh_close_links_timer, wpa_s, NULL);
 }
 
 
@@ -609,6 +635,9 @@ void wpa_mesh_new_mesh_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 	struct wpa_ssid *ssid = wpa_s->current_ssid;
 	struct ieee80211_mesh_config *mesh_conf_ie =
 		(struct ieee80211_mesh_config *)elems->mesh_config;
+
+	if (wpa_s->ifmsh->mesh_deinit_process)
+		return;
 
     /* check if peer accepts new connection. Don't initiate link if peer is full*/
     if ((ssid && ssid->no_auto_peer) ||
