@@ -46,7 +46,8 @@ void wpa_supplicant_mesh_iface_deinit(struct wpa_supplicant *wpa_s,
 		return;
 
 	if (ifmsh->mconf) {
-		mesh_mpm_deinit(wpa_s, ifmsh);
+		struct hostapd_data *hapd = ifmsh->bss[0];
+		hostapd_free_stas(hapd);
 		if (ifmsh->mconf->rsn_ie) {
 			ifmsh->mconf->rsn_ie = NULL;
 			/* We cannot free this struct
@@ -139,6 +140,7 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 	if (!ifmsh)
 		return -ENOMEM;
 
+	ifmsh->mesh_deinit_process = FALSE;
 	ifmsh->drv_flags = wpa_s->drv_flags;
 	ifmsh->num_bss = 1;
 	ifmsh->bss = os_calloc(wpa_s->ifmsh->num_bss,
@@ -341,6 +343,9 @@ int wpa_supplicant_join_mesh(struct wpa_supplicant *wpa_s,
 		ret = -ENOENT;
 		goto out;
 	}
+
+	if (wpa_s->ifmsh)
+		mesh_mpm_close_links(wpa_s,wpa_s->ifmsh);
 
 	wpa_supplicant_mesh_deinit(wpa_s);
 
@@ -612,4 +617,11 @@ int wpas_mesh_peer_add(struct wpa_supplicant *wpa_s, const u8 *addr,
 		       int duration)
 {
 	return mesh_mpm_connect_peer(wpa_s, addr, duration);
+}
+
+
+int wpa_supplicant_leave_mesh_initiate(struct wpa_supplicant *wpa_s)
+{
+	wpa_s->ifmsh->mesh_deinit_process = TRUE;
+	mesh_mpm_close_links(wpa_s,wpa_s->ifmsh);
 }
