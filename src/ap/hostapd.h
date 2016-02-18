@@ -316,6 +316,7 @@ struct hostapd_iface {
 
 #ifdef CONFIG_MESH
 	struct mesh_conf *mconf;
+	Boolean  mesh_deinit_process;
 #endif /* CONFIG_MESH */
 
 	size_t num_bss;

@@ -2537,7 +2537,7 @@ void wpa_supplicant_deauthenticate(struct wpa_supplicant *wpa_s,
 	if (wpa_s->ifmsh) {
 		wpa_msg_ctrl(wpa_s, MSG_INFO, MESH_GROUP_REMOVED "%s",
 			     wpa_s->ifname);
-		wpa_supplicant_leave_mesh(wpa_s);
+		wpa_supplicant_leave_mesh_initiate(wpa_s);
 	}
 #endif /* CONFIG_MESH */
 
@@ -4808,10 +4808,8 @@ static void wpa_supplicant_deinit_iface(struct wpa_supplicant *wpa_s,
 	}
 
 #ifdef CONFIG_MESH
-	if (wpa_s->ifmsh) {
-		wpa_supplicant_mesh_iface_deinit(wpa_s, wpa_s->ifmsh);
-		wpa_s->ifmsh = NULL;
-	}
+	if (wpa_s->ifmsh)
+		wpa_supplicant_leave_mesh(wpa_s);
 #endif /* CONFIG_MESH */
 
 	if (wpa_s->conf != NULL) {
