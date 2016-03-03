@@ -400,6 +400,10 @@ static void mesh_close_links_timer(void *eloop_ctx, void *user_data)
 {
 	struct wpa_supplicant *wpa_s = eloop_ctx;
 	struct hostapd_data *hapd = NULL;
+	u8 *addr = NULL;
+	union wpa_event_data event;
+	int zero_addr = 0;
+	int reason_code = WLAN_REASON_DEAUTH_LEAVING;
 
 	if (wpa_s->ifmsh)
 		hapd = wpa_s->ifmsh->bss[0];
@@ -420,8 +424,42 @@ static void mesh_close_links_timer(void *eloop_ctx, void *user_data)
 
 	wpa_s->global->mesh_on_demand.anyMeshConnected = FALSE;
 
+	wpa_msg(wpa_s, MSG_ERROR,"GOT BEFORE HERE ###### - deinit mesh");	
 	if ( (wpa_s->ifmsh) && (wpa_s->ifmsh->mesh_deinit_process))
+	{
+		wpa_msg(wpa_s, MSG_ERROR,"GOT HERE ###### - deinit mesh");	
 		wpa_supplicant_leave_mesh(wpa_s);
+	}
+
+	if (!is_zero_ether_addr(wpa_s->bssid))
+		addr = wpa_s->bssid;
+	else if (!is_zero_ether_addr(wpa_s->pending_bssid) &&
+		 (wpa_s->wpa_state == WPA_AUTHENTICATING ||
+		  wpa_s->wpa_state == WPA_ASSOCIATING))
+		addr = wpa_s->pending_bssid;
+	else if (wpa_s->wpa_state == WPA_ASSOCIATING) {
+		/*
+		 * When using driver-based BSS selection, we may not know the
+		 * BSSID with which we are currently trying to associate. We
+		 * need to notify the driver of this disconnection even in such
+		 * a case, so use the all zeros address here.
+		 */
+		addr = wpa_s->bssid;
+		zero_addr = 1;
+	}		
+	
+	if (addr) {
+		wpa_drv_deauthenticate(wpa_s, addr, reason_code);
+		os_memset(&event, 0, sizeof(event));
+		event.deauth_info.reason_code = (u16) reason_code;
+		event.deauth_info.locally_generated = 1;
+		wpa_supplicant_event(wpa_s, EVENT_DEAUTH, &event);
+		if (zero_addr)
+			addr = NULL;
+	}
+
+	wpa_supplicant_clear_connection(wpa_s, addr);
+
 	
 }
 

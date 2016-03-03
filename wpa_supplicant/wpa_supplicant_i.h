@@ -1166,6 +1166,7 @@ int wpa_supplicant_fast_associate(struct wpa_supplicant *wpa_s);
 struct wpa_bss * wpa_supplicant_pick_network(struct wpa_supplicant *wpa_s,
 					     struct wpa_ssid **selected_ssid);
 
+void wpa_supplicant_clear_connection(struct wpa_supplicant *wpa_s,const u8 *addr);
 /* eap_register.c */
 int eap_register_methods(void);
 
