@@ -1595,7 +1595,7 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 	} else {
 #ifdef CONFIG_MESH
 		if (wpa_s->ifmsh) {
-			wpa_msg(wpa_s, MSG_INFO,
+			wpa_msg(wpa_s, MSG_DEBUG,
 				"Avoiding join because we already joined a mesh group");
 			return 0;
 		}
