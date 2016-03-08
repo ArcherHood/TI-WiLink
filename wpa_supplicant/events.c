@@ -1553,25 +1553,25 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 
 	if (selected) {
 		int skip;
-		
+
 		// in case we are running mesh on demand we need to see if we would like to connect at all
 		if (wpa_s->global->mesh_on_demand.enabled)
-		{			
+		{
 			wpa_s->global->mesh_on_demand.meshBlocked = TRUE;
 
 			// if we are below the connection threshold  
 			if (selected->level < wpa_s->global->mesh_on_demand.signal_threshold)
 			{
 				wpa_s->global->mesh_on_demand.meshBlocked = FALSE;
-					
+
 				if (wpa_s->global->mesh_on_demand.anyMeshConnected)
 				{
-					wpa_supplicant_req_scan(wpa_s,1,0);
-					wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - Mesh connected and bad RSSI - Don't connect");				
+					wpa_supplicant_req_scan(wpa_s,10,0);
+					wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - Mesh connected and bad RSSI - Don't connect");
 					return -1;
 				}
 			}
-						
+
 		}
 
 		skip = !wpa_supplicant_need_to_roam(wpa_s, selected, ssid);
@@ -1595,7 +1595,7 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 	} else {
 #ifdef CONFIG_MESH
 		if (wpa_s->ifmsh) {
-			wpa_msg(wpa_s, MSG_INFO,
+			wpa_msg(wpa_s, MSG_DEBUG,
 				"Avoiding join because we already joined a mesh group");
 			return 0;
 		}
@@ -2299,7 +2299,7 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 	if ( (wpa_s->global->mesh_on_demand.enabled) 
 		&& (wpa_s->wpa_state == WPA_COMPLETED)
 		&&  (wpa_s->global->mesh_on_demand.anyMeshConnected)) {
-		
+
 			wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - remove all mesh connections now that we found a good AP");						
 			mesh_mpm_close_links(wpa_s->global->mesh_on_demand.mesh_wpa_s,
 								     wpa_s->global->mesh_on_demand.mesh_wpa_s->ifmsh);
@@ -3816,10 +3816,10 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 				wpa_printf(MSG_INFO, "Threshold was crossed upwards - RSSI is higher");
 				wpa_s->global->mesh_on_demand.meshBlocked = TRUE;
 			}
-			
+
 		}
-		
-		break;	
+
+		break;
 	case EVENT_INTERFACE_ENABLED:
 		wpa_dbg(wpa_s, MSG_DEBUG, "Interface was enabled");
 		if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED) {

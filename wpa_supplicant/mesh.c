@@ -283,13 +283,13 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 		struct wpa_driver_nl80211_data *drv;
 		struct wpa_supplicant *keep_wpa_s;
 		Boolean found = FALSE;
-	
+
 		wpa_s->global->mesh_on_demand.enabled 			= TRUE;
-		wpa_s->global->mesh_on_demand.mesh_wpa_s		= wpa_s; 		
+		wpa_s->global->mesh_on_demand.mesh_wpa_s		= wpa_s;
 		wpa_s->global->mesh_on_demand.signal_threshold 	= wpa_s->conf->signal_threshold;
 		wpa_s->global->mesh_on_demand.meshBlocked	 	= FALSE;
 		sprintf(wpa_s->global->mesh_on_demand.signal_threshold_name,"learn:30:%d:30\n",wpa_s->global->mesh_on_demand.signal_threshold);
-		
+
 		/*
 		* Check if we already have a connected station 
 		* if that's the case write over the bgscan parameters the new threshold value we would like to use
@@ -322,7 +322,7 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 				wpa_supplicant_start_bgscan(keep_wpa_s);
 			}
 		}
-		
+
 	}
 
 	return 0;

@@ -424,43 +424,40 @@ static void mesh_close_links_timer(void *eloop_ctx, void *user_data)
 
 	wpa_s->global->mesh_on_demand.anyMeshConnected = FALSE;
 
-	wpa_msg(wpa_s, MSG_ERROR,"GOT BEFORE HERE ###### - deinit mesh");	
 	if ( (wpa_s->ifmsh) && (wpa_s->ifmsh->mesh_deinit_process))
 	{
-		wpa_msg(wpa_s, MSG_ERROR,"GOT HERE ###### - deinit mesh");	
 		wpa_supplicant_leave_mesh(wpa_s);
+
+		if (!is_zero_ether_addr(wpa_s->bssid))
+			addr = wpa_s->bssid;
+		else if (!is_zero_ether_addr(wpa_s->pending_bssid) &&
+			 (wpa_s->wpa_state == WPA_AUTHENTICATING ||
+			  wpa_s->wpa_state == WPA_ASSOCIATING))
+			addr = wpa_s->pending_bssid;
+		else if (wpa_s->wpa_state == WPA_ASSOCIATING) {
+			/*
+			 * When using driver-based BSS selection, we may not know the
+			 * BSSID with which we are currently trying to associate. We
+			 * need to notify the driver of this disconnection even in such
+			 * a case, so use the all zeros address here.
+			 */
+			addr = wpa_s->bssid;
+			zero_addr = 1;
+		}
+
+		if (addr) {
+			wpa_drv_deauthenticate(wpa_s, addr, reason_code);
+			os_memset(&event, 0, sizeof(event));
+			event.deauth_info.reason_code = (u16) reason_code;
+			event.deauth_info.locally_generated = 1;
+			wpa_supplicant_event(wpa_s, EVENT_DEAUTH, &event);
+			if (zero_addr)
+				addr = NULL;
+		}
+
+		wpa_supplicant_clear_connection(wpa_s, addr);
+
 	}
-
-	if (!is_zero_ether_addr(wpa_s->bssid))
-		addr = wpa_s->bssid;
-	else if (!is_zero_ether_addr(wpa_s->pending_bssid) &&
-		 (wpa_s->wpa_state == WPA_AUTHENTICATING ||
-		  wpa_s->wpa_state == WPA_ASSOCIATING))
-		addr = wpa_s->pending_bssid;
-	else if (wpa_s->wpa_state == WPA_ASSOCIATING) {
-		/*
-		 * When using driver-based BSS selection, we may not know the
-		 * BSSID with which we are currently trying to associate. We
-		 * need to notify the driver of this disconnection even in such
-		 * a case, so use the all zeros address here.
-		 */
-		addr = wpa_s->bssid;
-		zero_addr = 1;
-	}		
-	
-	if (addr) {
-		wpa_drv_deauthenticate(wpa_s, addr, reason_code);
-		os_memset(&event, 0, sizeof(event));
-		event.deauth_info.reason_code = (u16) reason_code;
-		event.deauth_info.locally_generated = 1;
-		wpa_supplicant_event(wpa_s, EVENT_DEAUTH, &event);
-		if (zero_addr)
-			addr = NULL;
-	}
-
-	wpa_supplicant_clear_connection(wpa_s, addr);
-
-	
 }
 
 static void plink_timer(void *eloop_ctx, void *user_data)
@@ -653,7 +650,6 @@ static struct sta_info * mesh_mpm_add_peer(struct wpa_supplicant *wpa_s,
 		sta->flags |= WLAN_STA_MFP;
 		params.flags |= WPA_STA_MFP;
 	}
-
 	ret = wpa_drv_sta_add(wpa_s, &params);
 	if (ret) {
 		wpa_msg(wpa_s, MSG_ERROR,
@@ -677,48 +673,51 @@ void wpa_mesh_new_mesh_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 	struct ieee80211_mesh_config *mesh_conf_ie =
              (struct ieee80211_mesh_config *)elems->mesh_config;
 
+	if (data->mesh_pending_auth) {
+		struct os_reltime age;
+		const struct ieee80211_mgmt *mgmt;
+		struct hostapd_frame_info fi;
+
+		mgmt = wpabuf_head(data->mesh_pending_auth);
+		os_reltime_age(&data->mesh_pending_auth_time, &age);
+		if (age.sec < 2 &&
+		    os_memcmp(mgmt->sa, addr, ETH_ALEN) == 0) {
+
+			sta = mesh_mpm_add_peer(wpa_s, addr, elems);
+			if (!sta)
+				return;
+
+			wpa_printf(MSG_DEBUG,
+				   "mesh: Process pending Authentication frame from %u.%06u seconds ago",
+				   (unsigned int) age.sec,
+				   (unsigned int) age.usec);
+			os_memset(&fi, 0, sizeof(fi));
+			ieee802_11_mgmt(
+				data,
+				wpabuf_head(data->mesh_pending_auth),
+				wpabuf_len(data->mesh_pending_auth),
+				&fi);
+		}
+		wpabuf_free(data->mesh_pending_auth);
+		data->mesh_pending_auth = NULL;
+		return;
+	}
+
 	if (wpa_s->ifmsh->mesh_deinit_process)
 		return;
-	
+
 	if ( (wpa_s->global->mesh_on_demand.enabled) && (wpa_s->global->mesh_on_demand.meshBlocked) )
 	{
 		wpa_msg(wpa_s, MSG_DEBUG, "mesh_on_demand: wpa_mesh_new_mesh_peer - mesh_block is ON");
 		return;
 	}
 
-	sta = mesh_mpm_add_peer(wpa_s, addr, elems);
-	if (!sta)
-		return;
-	
+
 	/* check if peer accepts new connection. Don't initiate link if peer is full*/
 	if ((ssid && ssid->no_auto_peer) ||
                !(mesh_conf_ie->capab & WLAN_MESHCONF_CAPAB_ACCEPT_PLINKS)) {
                wpa_msg(wpa_s, MSG_ERROR, "will not initiate new peer link with "
                        MACSTR " either no_auto_peer or peer does not allow new links", MAC2STR(addr));
-
-		if (data->mesh_pending_auth) {
-			struct os_reltime age;
-			const struct ieee80211_mgmt *mgmt;
-			struct hostapd_frame_info fi;
-
-			mgmt = wpabuf_head(data->mesh_pending_auth);
-			os_reltime_age(&data->mesh_pending_auth_time, &age);
-			if (age.sec < 2 &&
-			    os_memcmp(mgmt->sa, addr, ETH_ALEN) == 0) {
-				wpa_printf(MSG_DEBUG,
-					   "mesh: Process pending Authentication frame from %u.%06u seconds ago",
-					   (unsigned int) age.sec,
-					   (unsigned int) age.usec);
-				os_memset(&fi, 0, sizeof(fi));
-				ieee802_11_mgmt(
-					data,
-					wpabuf_head(data->mesh_pending_auth),
-					wpabuf_len(data->mesh_pending_auth),
-					&fi);
-			}
-			wpabuf_free(data->mesh_pending_auth);
-			data->mesh_pending_auth = NULL;
-		}
 		return;
 	}
 
@@ -880,26 +879,26 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 				struct wpa_driver_nl80211_data *drv;
 
 				wpa_s->global->mesh_on_demand.anyMeshConnected = TRUE;
-				
+
 				keep_wpa_s = wpa_s->global->ifaces;
 
 				while (keep_wpa_s && !found)
 				{
 					bss = keep_wpa_s->drv_priv;
 					drv = bss->drv;
-					
-					if (drv->nlmode == NL80211_IFTYPE_STATION)						
+
+					if (drv->nlmode == NL80211_IFTYPE_STATION)
 						found = TRUE;
 					else
 						keep_wpa_s = keep_wpa_s->next;
 				}
 			}
-				
+
 			if ( (found) && (keep_wpa_s->wpa_state == WPA_COMPLETED) &&  
 						 (wpa_s->global->mesh_on_demand.meshBlocked == FALSE) )
-			{			
-				struct wpa_ssid *keep_current_ssid;			
-				
+			{
+				struct wpa_ssid *keep_current_ssid;
+
 				keep_current_ssid = keep_wpa_s->current_ssid;
 
 				wpa_msg(wpa_s, MSG_DEBUG, "mesh on demand: disconnect station current SSID is: %s!!!",wpa_ssid_txt(keep_current_ssid->ssid,keep_current_ssid->ssid_len));
@@ -993,6 +992,15 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 		switch (event) {
 		case CLS_ACPT:
 			mesh_mpm_fsm_restart(wpa_s, sta);
+
+			if ( (hapd) && (hapd->num_plinks == 0) )
+			{
+
+				wpa_s->global->mesh_on_demand.anyMeshConnected = FALSE;
+
+				if ( (wpa_s->ifmsh) && (wpa_s->ifmsh->mesh_deinit_process))
+					wpa_supplicant_leave_mesh(wpa_s);
+			}
 			break;
 		case OPN_ACPT:
 		case CNF_ACPT:
@@ -1109,7 +1117,7 @@ void mesh_mpm_action_rx(struct wpa_supplicant *wpa_s,
 
 	// check if we are currently in a deinit procedure - if that's the case
 	// don't reply and don't add the new peer
-	if (wpa_s->ifmsh->mesh_deinit_process == TRUE)
+	if ((wpa_s->ifmsh) && (wpa_s->ifmsh->mesh_deinit_process == TRUE))
 		return;
 	/*
 	 * If this is an open frame from an unknown STA, and this is an
