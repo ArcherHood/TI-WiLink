@@ -2556,9 +2556,9 @@ void wpa_supplicant_deauthenticate(struct wpa_supplicant *wpa_s,
 	wpa_supplicant_clear_connection(wpa_s, addr);
 #ifdef CONFIG_MESH
 	}
-#endif	
+#endif
 }
- 
+
 static void wpa_supplicant_enable_one_network(struct wpa_supplicant *wpa_s,
 					      struct wpa_ssid *ssid)
 {
@@ -4848,7 +4848,7 @@ struct wpa_supplicant * wpa_supplicant_add_iface(struct wpa_global *global,
 	struct wpa_supplicant *wpa_s;
 	struct wpa_interface t_iface;
 	struct wpa_ssid *ssid;
-	
+
 
 	if (global == NULL || iface == NULL)
 		return NULL;
