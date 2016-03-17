@@ -1671,6 +1671,18 @@ void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 		}
 		if (bss)
 			ssid->frequency = bss->freq;
+		else {
+			struct wpa_channel_info info;
+
+			if ((wpa_drv_shared_ap_freq(wpa_s, &info) == 1) &&
+			    (ssid->frequency != info.frequency)) {
+				wpa_msg(wpa_s, MSG_ERROR, "AP running ""
+					"on a different channel. ""
+					"Will not join mesh");
+				return;
+			}
+		}
+
 		if (wpa_supplicant_join_mesh(wpa_s, ssid) < 0) {
 			wpa_msg(wpa_s, MSG_ERROR, "Could not join mesh");
 			return;
