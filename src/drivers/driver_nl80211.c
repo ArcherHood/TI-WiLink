@@ -6891,7 +6891,8 @@ static int ap_freq_info_handler(struct nl_msg *msg, void *arg)
 
 	/* we only care about APs */
 	iftype = nla_get_u32(tb[NL80211_ATTR_IFTYPE]);
-	if (iftype != NL80211_IFTYPE_AP && iftype != NL80211_IFTYPE_P2P_GO)
+	if (iftype != NL80211_IFTYPE_AP && iftype != NL80211_IFTYPE_P2P_GO &&
+	    iftype != NL80211_IFTYPE_MESH_POINT)
 		goto out;
 
 	data->info->frequency = nla_get_u32(tb[NL80211_ATTR_WIPHY_FREQ]);
