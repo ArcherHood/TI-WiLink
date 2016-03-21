@@ -5265,6 +5265,10 @@ static int i802_flush(void *priv)
 	wpa_printf(MSG_DEBUG, "nl80211: flush -> DEL_STATION %s (all)",
 		   bss->ifname);
 
+	if (!is_ap_interface(bss->drv->nlmode) &&
+	    !is_mesh_interface(bss->drv->nlmode))
+		return 0;
+
 	/*
 	 * XXX: FIX! this needs to flush all VLANs too
 	 */
