@@ -66,7 +66,6 @@ static const char * const mplevent[] = {
 	[CLS_IGNR] = "CLS_IGNR"
 };
 
-
 static int mesh_mpm_parse_peer_mgmt(struct wpa_supplicant *wpa_s,
 				    u8 action_field,
 				    const u8 *ie, size_t len,
@@ -663,7 +662,6 @@ static struct sta_info * mesh_mpm_add_peer(struct wpa_supplicant *wpa_s,
 	return sta;
 }
 
-
 void wpa_mesh_new_mesh_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 			    struct ieee802_11_elems *elems)
 {
@@ -708,10 +706,7 @@ void wpa_mesh_new_mesh_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 		return;
 
 	if ( (wpa_s->global->mesh_on_demand.enabled) && (wpa_s->global->mesh_on_demand.meshBlocked) )
-	{
-		wpa_msg(wpa_s, MSG_DEBUG, "mesh_on_demand: wpa_mesh_new_mesh_peer - mesh_block is ON");
 		return;
-	}
 
 
 	/* check if peer accepts new connection. Don't initiate link if peer is full*/
@@ -743,7 +738,6 @@ void mesh_mpm_mgmt_rx(struct wpa_supplicant *wpa_s, struct rx_mgmt *rx_mgmt)
 	ieee802_11_mgmt(wpa_s->ifmsh->bss[0], rx_mgmt->frame,
 			rx_mgmt->frame_len, &fi);
 }
-
 
 static void mesh_mpm_plink_estab(struct wpa_supplicant *wpa_s,
 				 struct sta_info *sta)

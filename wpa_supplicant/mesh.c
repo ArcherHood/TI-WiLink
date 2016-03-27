@@ -287,7 +287,8 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 		wpa_s->global->mesh_on_demand.enabled 			= TRUE;
 		wpa_s->global->mesh_on_demand.mesh_wpa_s		= wpa_s;
 		wpa_s->global->mesh_on_demand.signal_threshold 	= wpa_s->conf->signal_threshold;
-		wpa_s->global->mesh_on_demand.meshBlocked	 	= FALSE;
+		wpa_s->global->mesh_on_demand.meshBlocked	 	= TRUE;
+		wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ============= MESH IS BLOCKED");					
 		sprintf(wpa_s->global->mesh_on_demand.signal_threshold_name,"learn:30:%d:30\n",wpa_s->global->mesh_on_demand.signal_threshold);
 
 		/*
@@ -337,7 +338,7 @@ void wpa_mesh_notify_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 {
 	struct ieee802_11_elems elems;
 
-	wpa_msg(wpa_s, MSG_INFO,
+	wpa_msg(wpa_s, MSG_DEBUG,
 		"new peer notification for " MACSTR, MAC2STR(addr));
 
 	if (ieee802_11_parse_elems(ies, ie_len, &elems, 0) == ParseFailed) {

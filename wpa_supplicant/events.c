@@ -1406,6 +1406,13 @@ static int _wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 		ap = 1;
 #endif /* CONFIG_AP */
 
+#ifdef CONFIG_MESH
+	if (wpa_s->global->mesh_on_demand.enabled)
+		if ( (wpa_s->ifmsh) && (!own_request))
+			return -1;
+#endif
+
+	
 	wpa_supplicant_notify_scanning(wpa_s, 0);
 
 	scan_res = wpa_supplicant_get_scan_results(wpa_s,
@@ -1557,18 +1564,24 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 		// in case we are running mesh on demand we need to see if we would like to connect at all
 		if (wpa_s->global->mesh_on_demand.enabled)
 		{
-			wpa_s->global->mesh_on_demand.meshBlocked = TRUE;
-
-			// if we are below the connection threshold  
-			if (selected->level < wpa_s->global->mesh_on_demand.signal_threshold)
+			// we should only check this for the station and not the mesh interface
+			if (wpa_s != wpa_s->global->mesh_on_demand.mesh_wpa_s)
 			{
-				wpa_s->global->mesh_on_demand.meshBlocked = FALSE;
+				wpa_s->global->mesh_on_demand.meshBlocked = TRUE;
+				wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ============= MESH IS BLOCKED");			
 
-				if (wpa_s->global->mesh_on_demand.anyMeshConnected)
+				// if we are below the connection threshold  
+				if (selected->level < wpa_s->global->mesh_on_demand.signal_threshold)
 				{
-					wpa_supplicant_req_scan(wpa_s,10,0);
-					wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - Mesh connected and bad RSSI - Don't connect");
-					return -1;
+					wpa_s->global->mesh_on_demand.meshBlocked = FALSE;
+					wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ********************* MESH IS UNBLOCKED");
+					
+					if (wpa_s->global->mesh_on_demand.anyMeshConnected)
+					{
+						wpa_supplicant_req_scan(wpa_s,10,0);
+						wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - Mesh connected and bad RSSI - Don't connect");
+						return -1;
+					}
 				}
 			}
 
@@ -1594,6 +1607,16 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 		return 1;
 	} else {
 #ifdef CONFIG_MESH
+		// in case we are running mesh on demand and didn't find our AP we should unblock mesh connections now
+		if (wpa_s->global->mesh_on_demand.enabled)
+		{
+			if (wpa_s != wpa_s->global->mesh_on_demand.mesh_wpa_s)
+			{				
+				wpa_s->global->mesh_on_demand.meshBlocked = FALSE;
+				wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ********************* MESH IS UNBLOCKED");		
+			}
+		}
+
 		if (wpa_s->ifmsh) {
 			wpa_msg(wpa_s, MSG_DEBUG,
 				"Avoiding join because we already joined a mesh group");
@@ -3810,11 +3833,14 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			{
 				wpa_printf(MSG_INFO, "Threshold was crossed downwards - RSSI is lower");
 				wpa_s->global->mesh_on_demand.meshBlocked = FALSE;
+				wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ********************* MESH IS UNBLOCKED");
+				
 			}
 			else
 			{
-				wpa_printf(MSG_INFO, "Threshold was crossed upwards - RSSI is higher");
+				wpa_printf(MSG_INFO, "Threshold was crossed upwards - RSSI is higher");				
 				wpa_s->global->mesh_on_demand.meshBlocked = TRUE;
+				wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ============= MESH IS BLOCKED");			
 			}
 
 		}
