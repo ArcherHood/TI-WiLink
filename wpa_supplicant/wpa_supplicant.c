@@ -1980,9 +1980,13 @@ void ibss_mesh_setup_freq(struct wpa_supplicant *wpa_s,
 			break;
 		case 2:
 			/* Switch pri/sec channels */
-			freq->freq = hw_get_freq(mode, sec_chan->chan);
-			freq->sec_channel_offset = -freq->sec_channel_offset;
-			freq->channel = sec_chan->chan;
+			if (ssid->mode == WPAS_MODE_MESH) {
+                                wpa_printf(MSG_INFO, "Mesh will NOT Switch channels");
+			} else{
+				freq->freq = hw_get_freq(mode, sec_chan->chan);
+				freq->sec_channel_offset = -freq->sec_channel_offset;
+				freq->channel = sec_chan->chan;
+			}
 			break;
 		default:
 			freq->sec_channel_offset = 0;
