@@ -469,6 +469,11 @@ int wpa_supplicant_join_mesh(struct wpa_supplicant *wpa_s,
 		goto out;
 	}
 
+        /*In case freq was changed (by ibss_mesh_setup_freq),
+		update the freq in ifmesh*/
+        if (wpa_s->ifmsh->freq != params.freq.freq)
+		wpa_s->ifmsh->freq = params.freq.freq;
+
 	if (wpa_s->ifmsh) {
 		params.ies = wpa_s->ifmsh->mconf->rsn_ie;
 		params.ie_len = wpa_s->ifmsh->mconf->rsn_ie_len;
