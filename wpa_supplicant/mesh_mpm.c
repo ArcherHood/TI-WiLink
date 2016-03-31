@@ -366,7 +366,7 @@ static void mesh_mpm_send_plink_action(struct wpa_supplicant *wpa_s,
 	wpa_msg(wpa_s, MSG_DEBUG, "Mesh MPM: Sending peering frame type %d to "
 		MACSTR " (my_lid=0x%x peer_lid=0x%x)",
 		type, MAC2STR(sta->addr), sta->my_lid, sta->peer_lid);
-	ret = wpa_drv_send_action(wpa_s, wpa_s->assoc_freq, 0,
+        ret = wpa_drv_send_action(wpa_s, wpa_s->ifmsh->freq, 0,
 				  sta->addr, wpa_s->own_addr, wpa_s->own_addr,
 				  wpabuf_head(buf), wpabuf_len(buf), 0);
 	if (ret < 0)
