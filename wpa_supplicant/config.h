@@ -1291,6 +1291,12 @@ struct wpa_config {
 	 */
 	enum mbo_cellular_capa mbo_cell_capa;
 #endif /* CONFIG_MBO */
+	
+	/**
+	 * mesh on demand - flag if mesh on demand is enabled
+	 */
+	int mesh_on_demand;
+	int signal_threshold;
 };
 
 

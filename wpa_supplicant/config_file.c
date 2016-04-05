@@ -1334,6 +1334,12 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 	if (config->mbo_cell_capa != DEFAULT_MBO_CELL_CAPA)
 		fprintf(f, "mbo_cell_capa=%u\n", config->mbo_cell_capa);
 #endif /* CONFIG_MBO */
+     
+	if (config->mesh_on_demand)
+		fprintf(f, "mesh_on_demand=%d\n", config->mesh_on_demand);
+
+     if (config->signal_threshold)
+		fprintf(f, "signal_threshold=%d\n", config->signal_threshold);
 
 }
 

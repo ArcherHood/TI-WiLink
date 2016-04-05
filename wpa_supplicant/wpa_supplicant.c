@@ -653,7 +653,7 @@ const char * wpa_supplicant_state_txt(enum wpa_states state)
 
 #ifdef CONFIG_BGSCAN
 
-static void wpa_supplicant_start_bgscan(struct wpa_supplicant *wpa_s)
+ void wpa_supplicant_start_bgscan(struct wpa_supplicant *wpa_s)
 {
 	const char *name;
 
@@ -661,6 +661,16 @@ static void wpa_supplicant_start_bgscan(struct wpa_supplicant *wpa_s)
 		name = wpa_s->current_ssid->bgscan;
 	else
 		name = wpa_s->conf->bgscan;
+
+	/*
+	* If mesh on demand is enabled take the parameters from the signal threshold
+	* mesh on demand parameter
+	*/
+	if (wpa_s->global->mesh_on_demand.enabled)
+	{
+		name = wpa_s->global->mesh_on_demand.signal_threshold_name;
+	}
+
 	if (name == NULL || name[0] == '\0')
 		return;
 	if (wpas_driver_bss_selection(wpa_s))
@@ -696,8 +706,7 @@ static void wpa_supplicant_start_bgscan(struct wpa_supplicant *wpa_s)
 		wpa_s->bgscan_ssid = NULL;
 }
 
-
-static void wpa_supplicant_stop_bgscan(struct wpa_supplicant *wpa_s)
+void wpa_supplicant_stop_bgscan(struct wpa_supplicant *wpa_s)
 {
 	if (wpa_s->bgscan_ssid != NULL) {
 		bgscan_deinit(wpa_s);
@@ -819,6 +828,12 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 	}
 	wpa_s->wpa_state = state;
 
+	if (wpa_s->global->mesh_on_demand.enabled)
+		if (state == WPA_DISCONNECTED)
+		{
+			wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ********************* MESH IS UNBLOCKED");
+			wpa_s->global->mesh_on_demand.meshBlocked = FALSE;
+		}
 #ifdef CONFIG_BGSCAN
 	if (state == WPA_COMPLETED)
 		wpa_supplicant_start_bgscan(wpa_s);
@@ -5099,6 +5114,7 @@ struct wpa_supplicant * wpa_supplicant_add_iface(struct wpa_global *global,
 	struct wpa_interface t_iface;
 	struct wpa_ssid *ssid;
 
+
 	if (global == NULL || iface == NULL)
 		return NULL;
 
@@ -5444,6 +5460,8 @@ struct wpa_global * wpa_supplicant_init(struct wpa_params *params)
 		return NULL;
 	}
 #endif /* CONFIG_WIFI_DISPLAY */
+
+	memset(&global->mesh_on_demand,0,sizeof(global->mesh_on_demand));
 
 	eloop_register_timeout(WPA_SUPPLICANT_CLEANUP_INTERVAL, 0,
 			       wpas_periodic, global, NULL);
