@@ -2490,7 +2490,7 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 }
 
 
-static void wpa_supplicant_clear_connection(struct wpa_supplicant *wpa_s,
+void wpa_supplicant_clear_connection(struct wpa_supplicant *wpa_s,
 					    const u8 *addr)
 {
 	struct wpa_ssid *old_ssid;
@@ -2554,6 +2554,8 @@ void wpa_supplicant_deauthenticate(struct wpa_supplicant *wpa_s,
 			     wpa_s->ifname);
 		wpa_supplicant_leave_mesh_initiate(wpa_s);
 	}
+	else
+	{
 #endif /* CONFIG_MESH */
 
 	if (addr) {
@@ -2567,6 +2569,9 @@ void wpa_supplicant_deauthenticate(struct wpa_supplicant *wpa_s,
 	}
 
 	wpa_supplicant_clear_connection(wpa_s, addr);
+#ifdef CONFIG_MESH
+	}
+#endif
 }
 
 static void wpa_supplicant_enable_one_network(struct wpa_supplicant *wpa_s,
