@@ -141,6 +141,7 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 	if (!ifmsh)
 		return -ENOMEM;
 
+	ifmsh->owner = wpa_s;
 	ifmsh->mesh_deinit_process = FALSE;
 	ifmsh->drv_flags = wpa_s->drv_flags;
 	ifmsh->num_bss = 1;
@@ -611,6 +612,7 @@ int wpas_mesh_add_interface(struct wpa_supplicant *wpa_s, char *ifname,
 	mesh_wpa_s->mesh_if_created = 1;
 	return 0;
 }
+
 int wpa_supplicant_leave_mesh_initiate(struct wpa_supplicant *wpa_s)
 {
 	wpa_s->ifmsh->mesh_deinit_process = TRUE;

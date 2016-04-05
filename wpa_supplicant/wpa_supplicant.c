@@ -800,7 +800,10 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 
 	if (wpa_s->global->mesh_on_demand.enabled)
 		if (state == WPA_DISCONNECTED)	
+		{
+			wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ********************* MESH IS UNBLOCKED");
 			wpa_s->global->mesh_on_demand.meshBlocked = FALSE;
+		}
 #ifdef CONFIG_BGSCAN
 	if (state == WPA_COMPLETED)
 		wpa_supplicant_start_bgscan(wpa_s);
