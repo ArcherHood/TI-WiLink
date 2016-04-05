@@ -25,6 +25,7 @@
 #include "mesh_mpm.h"
 #include "mesh_rsn.h"
 #include "mesh.h"
+#include "../src/drivers/driver_nl80211.h"
 
 
 static void wpa_supplicant_mesh_deinit(struct wpa_supplicant *wpa_s)
@@ -140,6 +141,7 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 	if (!ifmsh)
 		return -ENOMEM;
 
+	ifmsh->owner = wpa_s;
 	ifmsh->mesh_deinit_process = FALSE;
 	ifmsh->drv_flags = wpa_s->drv_flags;
 	ifmsh->num_bss = 1;
@@ -273,6 +275,58 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 
 	wpa_supplicant_conf_ap_ht(wpa_s, ssid, conf);
 
+       /*
+       * Initialize mesh on demand parameters
+       */
+	if (wpa_s->conf->mesh_on_demand)
+	{
+		struct i802_bss *bss;
+		struct wpa_driver_nl80211_data *drv;
+		struct wpa_supplicant *keep_wpa_s;
+		Boolean found = FALSE;
+
+		wpa_s->global->mesh_on_demand.enabled 			= TRUE;
+		wpa_s->global->mesh_on_demand.mesh_wpa_s		= wpa_s;
+		wpa_s->global->mesh_on_demand.signal_threshold 	= wpa_s->conf->signal_threshold;
+		wpa_s->global->mesh_on_demand.meshBlocked	 	= TRUE;
+		wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ============= MESH IS BLOCKED");					
+		sprintf(wpa_s->global->mesh_on_demand.signal_threshold_name,"learn:30:%d:30\n",wpa_s->global->mesh_on_demand.signal_threshold);
+
+		/*
+		* Check if we already have a connected station 
+		* if that's the case write over the bgscan parameters the new threshold value we would like to use
+		*/
+
+		keep_wpa_s = wpa_s->global->ifaces;
+
+		while (keep_wpa_s && !found)
+		{
+			bss = keep_wpa_s->drv_priv;
+			drv = bss->drv;
+
+			if (drv->nlmode == NL80211_IFTYPE_STATION)
+				found = TRUE;
+			else
+				keep_wpa_s = keep_wpa_s->next;
+		}
+
+		if (found)
+		{
+			/*
+			* we have found the station connection and it's already connected
+			* stop the bgscan and send a new bgscan with the mesh on demand RSSI
+			* threshold parameters
+			*/
+
+			if (keep_wpa_s->wpa_state == WPA_COMPLETED)
+			{
+				wpa_supplicant_stop_bgscan(keep_wpa_s);
+				wpa_supplicant_start_bgscan(keep_wpa_s);
+			}
+		}
+
+	}
+
 	return 0;
 out_free:
 	wpa_supplicant_mesh_deinit(wpa_s);
@@ -285,7 +339,7 @@ void wpa_mesh_notify_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 {
 	struct ieee802_11_elems elems;
 
-	wpa_msg(wpa_s, MSG_INFO,
+	wpa_msg(wpa_s, MSG_DEBUG,
 		"new peer notification for " MACSTR, MAC2STR(addr));
 
 	if (ieee802_11_parse_elems(ies, ie_len, &elems, 0) == ParseFailed) {
@@ -553,6 +607,7 @@ int wpas_mesh_add_interface(struct wpa_supplicant *wpa_s, char *ifname,
 	mesh_wpa_s->mesh_if_created = 1;
 	return 0;
 }
+
 int wpa_supplicant_leave_mesh_initiate(struct wpa_supplicant *wpa_s)
 {
 	wpa_s->ifmsh->mesh_deinit_process = TRUE;

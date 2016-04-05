@@ -18,7 +18,6 @@ void mesh_mpm_free_sta(struct sta_info *sta);
 void wpa_mesh_set_plink_state(struct wpa_supplicant *wpa_s,
 			      struct sta_info *sta,
 			      enum mesh_plink_state state);
-
 #ifdef CONFIG_MESH
 
 void mesh_mpm_action_rx(struct wpa_supplicant *wpa_s,

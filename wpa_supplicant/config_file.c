@@ -1299,6 +1299,13 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 
 	if (config->wps_priority)
 		fprintf(f, "wps_priority=%d\n", config->wps_priority);
+
+     if (config->mesh_on_demand)
+		fprintf(f, "mesh_on_demand=%d\n", config->mesh_on_demand);
+
+     if (config->signal_threshold)
+		fprintf(f, "signal_threshold=%d\n", config->signal_threshold);
+
 }
 
 #endif /* CONFIG_NO_CONFIG_WRITE */
