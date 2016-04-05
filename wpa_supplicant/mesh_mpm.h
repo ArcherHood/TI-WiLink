@@ -30,7 +30,7 @@ void mesh_mpm_action_rx(struct wpa_supplicant *wpa_s,
 			const struct ieee80211_mgmt *mgmt, size_t len);
 void mesh_mpm_mgmt_rx(struct wpa_supplicant *wpa_s, struct rx_mgmt *rx_mgmt);
 
-#define MESH_CLOSE_LINKS_RESPONSE_TIMER	300000 // 300 ms - 300,000usec
+#define MESH_CLOSE_LINKS_RESPONSE_TIMER	100000 // 100 ms - 100,000usec
 
 #else /* CONFIG_MESH */
 
