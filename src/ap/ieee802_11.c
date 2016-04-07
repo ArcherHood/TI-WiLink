@@ -1127,7 +1127,7 @@ static void handle_auth(struct hostapd_data *hapd,
 		if ( (hapd->conf->mesh & MESH_ENABLED) && (sta->plink_state == PLINK_ESTAB) )
 		{
 			mesh_mpm_plink_close(hapd,sta,hapd->iface->owner);
-			hapd->num_plinks--;
+			return;		
 		}
 #endif /* CONFIG_MESH */
 	} else {

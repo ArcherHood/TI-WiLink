@@ -409,6 +409,8 @@ static void mesh_mpm_fsm_restart(struct wpa_supplicant *wpa_s,
 {
 	struct hostapd_data *hapd = wpa_s->ifmsh->bss[0];
 
+	hapd->num_plinks--;
+
 	eloop_cancel_timeout(plink_timer, wpa_s, sta);
 
 	ap_free_sta(hapd, sta);
@@ -444,7 +446,6 @@ static void mesh_close_links_timer(void *eloop_ctx, void *user_data)
 
 			if (hapd->num_plinks > 0)
 			{
-				hapd->num_plinks--;
 				mesh_mpm_fsm_restart(wpa_s, last_station);
 				next_station = last_station->next;
 			}
@@ -455,7 +456,6 @@ static void mesh_close_links_timer(void *eloop_ctx, void *user_data)
 			last_station = next_station;
 			next_station  = next_station->next;
 
-			hapd->num_plinks--;
 			mesh_mpm_fsm_restart(wpa_s, last_station);
 		}
 		hapd->num_plinks = 0;
@@ -568,15 +568,19 @@ int mesh_mpm_plink_close(struct hostapd_data *hapd, struct sta_info *sta,
 				void *ctx)
 {
 	struct wpa_supplicant *wpa_s = ctx;
+	struct mesh_conf *conf = wpa_s->ifmsh->mconf;
+	
 	int reason = WLAN_REASON_MESH_PEERING_CANCELLED;
 
 	if (sta) {
 		wpa_mesh_set_plink_state(wpa_s, sta, PLINK_HOLDING);
-//		hapd->num_plinks--;
+
 		mesh_mpm_send_plink_action(wpa_s, sta, PLINK_CLOSE, reason);
 		wpa_printf(MSG_DEBUG, "MPM closing plink sta=" MACSTR,
 			   MAC2STR(sta->addr));
-		eloop_cancel_timeout(plink_timer, wpa_s, sta);
+		eloop_register_timeout(conf->dot11MeshRetryTimeout / 1000,
+			       (conf->dot11MeshRetryTimeout % 1000) * 1000,
+			       plink_timer, wpa_s, sta);
 		return 0;
 	}
 
@@ -941,7 +945,7 @@ static void mesh_mpm_plink_estab(struct wpa_supplicant *wpa_s,
 	wpa_mesh_set_plink_state(wpa_s, sta, PLINK_ESTAB);
 	hapd->num_plinks++;
 
-	wpa_msg(wpa_s,MSG_INFO,"================================================> PLINKS NUMBER: %d",hapd->num_plinks);
+	wpa_msg(wpa_s,MSG_INFO,"===> PLINKS NUMBER: %d",hapd->num_plinks);
 
 	sta->flags |= WLAN_STA_ASSOC;
 	sta->mesh_sae_pmksa_caching = 0;
@@ -1145,8 +1149,6 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 
 			wpa_msg(wpa_s, MSG_INFO, MESH_PEER_DISCONNECTED MACSTR,
 				MAC2STR(sta->addr));
-
-			hapd->num_plinks--;
 
 			mesh_mpm_send_plink_action(wpa_s, sta,
 						   PLINK_CLOSE, reason);
