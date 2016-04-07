@@ -46,6 +46,7 @@
 #include "mesh.h"
 #include "mesh_mpm.h"
 #include "wmm_ac.h"
+#include "ap/sta_info.h"
 
 
 #ifndef CONFIG_NO_SCAN_PROCESSING
@@ -3952,8 +3953,16 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			hostapd_event_sta_low_ack(wpa_s->ap_iface->bss[0],
 						  data->low_ack.addr);
 		if (wpa_s->ifmsh && data)
-			hostapd_event_sta_low_ack(wpa_s->ifmsh->bss[0],
-						  data->low_ack.addr);
+		{
+			struct hostapd_data *hapd;
+			struct sta_info *sta;
+
+			hapd = wpa_s->ifmsh->bss[0];
+			sta = ap_get_sta(hapd,data->low_ack.addr);
+
+			if (sta->plink_state == PLINK_ESTAB)
+				mesh_mpm_plink_close(hapd,sta,wpa_s);		
+		}
 #endif /* CONFIG_AP */
 #ifdef CONFIG_TDLS
 		if (data)
