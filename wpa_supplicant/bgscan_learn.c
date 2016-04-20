@@ -419,7 +419,17 @@ static void * bgscan_learn_init(struct wpa_supplicant *wpa_s,
 			   "signal strength monitoring");
 	}
 
-	data->supp_freqs = bgscan_learn_get_supp_freqs(wpa_s);
+	if (wpa_s->global->mesh_on_demand.enabled)
+	{
+		data->supp_freqs = os_malloc(2*sizeof(int));
+		data->supp_freqs[0] = wpa_s->assoc_freq;
+		data->supp_freqs[1] = 0;
+	}
+	else
+	{
+		data->supp_freqs = bgscan_learn_get_supp_freqs(wpa_s);
+	}
+
 	data->scan_interval = data->short_interval;
 	if (data->signal_threshold) {
 		/* Poll for signal info to set initial scan interval */
